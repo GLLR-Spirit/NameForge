@@ -357,3 +357,173 @@ Ces éléments doivent être fournis par le propriétaire du projet ou par les c
 5. Refaire l'audit des bundles de production après intégration de la quarantaine de la PR #6.
 6. Ne choisir une licence globale pour NameForge qu'après clarification des droits sur le code, les contenus, les traductions et les médias.
 
+
+
+---
+
+## 15. Mise à jour après fusion des PR #4, #5 et #6 — 2026-11-20
+
+Cette section prévaut sur les passages historiques antérieurs qui décrivent les PR comme ouvertes ou la quarantaine comme non fusionnée.
+
+### 15.1 État technique désormais constaté dans `main`
+
+- Les PR #4 (registre des droits), #5 (migration SEO/Cloudflare) et #6 (quarantaine des banques de phrases) sont fermées et fusionnées.
+- Le commit de référence actuel vérifié est `aaaf61ff42516435ddbeb493aa4e83a7d74a8c2e`.
+- La PR #6 a retiré les banques éditoriales non vérifiées du chemin runtime actif et ajouté une documentation de quarantaine dans `docs/legal/quarantine/phrase-banks.md`.
+- Les anciennes versions des banques demeurent dans l'historique Git. La fusion n'a pas réécrit l'historique.
+- La validation GitHub Actions du commit `aaaf61f` a réussi : installation Chromium, audit npm, type-check, tests de régression, audit i18n, build, Playwright et Lighthouse.
+- Le check Cloudflare consulté indique un déploiement réussi avec une URL de prévisualisation. Ce résultat ne constitue pas, à lui seul, une preuve que l'URL de production `https://nameforge-bhk.pages.dev/` sert le commit courant. La production doit être vérifiée séparément par une requête HTTP et un contrôle de contenu/empreinte.
+
+### 15.2 Correction de statut des banques de phrases
+
+Les paragraphes précédents qui indiquent que les banques sont encore importées dans `main`, que la PR #6 est ouverte ou que le correctif n'est pas appliqué à `main` décrivent un état historique antérieur à la fusion. Ils ne décrivent plus l'état actuel du dépôt.
+
+La situation actuelle est la suivante : les banques concernées sont mises en quarantaine dans la branche principale et ne doivent pas être réactivées tant que leur provenance, leur auteur, leur licence ou autorisation et leurs obligations d'attribution ne sont pas documentés et vérifiés. Cette mesure technique ne prouve ni une violation ni la titularité des droits.
+
+### 15.3 Éléments juridiques qui restent non établis
+
+La fusion du registre et de la quarantaine ne crée aucune preuve de propriété et ne complète pas les pièces manquantes. Restent notamment à documenter :
+
+1. Les sources, auteurs, éventuels prompts/exports IA et conditions d'utilisation applicables aux banques de phrases historiques.
+2. Les sources et références par entrée pour les prénoms et affirmations étymologiques.
+3. Les auteurs, sources et méthodes de rédaction/traduction des 29 modules i18n.
+4. Les fichiers de travail, auteurs, ressources incorporées, licences, achats ou autorisations pour les sept images recensées et tout autre média.
+5. Les sources, versions, licences et obligations des corpus lexicaux, catégories, références katakana et enrichissements syllabiques.
+6. Les notices des versions exactes des dépendances npm/Rust, les artefacts réellement distribués et les notices à joindre.
+7. L'historique de création et les contributions tierces au code avant de choisir une licence globale.
+
+Aucune donnée d'auteur, licence, permission, prompt ou source ne doit être inventée pour remplir les champs manquants. En l'absence de pièce, conserver explicitement le statut « non vérifié » et ne pas présenter le contenu concerné comme propriété exclusive ou librement redistribuable.
+
+### 15.4 Prochaine étape probante
+
+Le propriétaire du projet et, le cas échéant, les contributeurs doivent fournir les éléments de preuve disponibles : fichiers sources datés, exports, historiques de travail, factures/licences, autorisations écrites, URL et versions des corpus, noms/coordonnées des créateurs avec leur accord, et notices des dépendances. Chaque pièce doit être rattachée à un élément précis du registre. Les éléments non justifiables devront rester exclus du runtime/publication ou être remplacés par des créations nouvelles et traçables.
+
+Cette mise à jour est documentaire. Elle ne modifie pas les données applicatives, les images, les licences du projet ni la visibilité du dépôt.
+
+
+## 16. Audit des deux archives Google AI Studio / NameForge — 2026-11-20
+
+### 16.1 Pièces examinées
+
+Deux archives fournies par le propriétaire du projet ont été examinées en lecture seule :
+
+| Archive | Entrées ZIP | Éléments significatifs | SHA-256 |
+|---|---:|---|---|
+| `NameForge.Version.2.zip` | 92 | Snapshot React/TypeScript/Vite; README décrivant 11 générateurs spécialisés et 21 archétypes; aucun dossier `.aistudio/` ni historique Git détecté | `452bc8a52a368979984cd83071c3a1782c6bda50ba2ce77fb55515293a67ba12` |
+| `nfv2.zip` | 266 | Projet plus volumineux; dossier `.aistudio/`; manifeste de transfert; patch; archive de transfert complémentaire; banques de phrases historiques et documentation de corpus | `c10a2d553808e3c573cc1ff6c4dd2795bf148f73638aa016967bbb7b28d6c768` |
+
+L'archive complémentaire incluse dans `nfv2.zip` contient 60 entrées. Le manifeste décrit un transfert de 62 opérations de fichiers (47 modifications, 9 ajouts et 6 suppressions) à partir d'un commit de référence du dépôt historique mentionné dans ce manifeste.
+
+### 16.2 Ce que les archives établissent
+
+- `nfv2.zip` contient des traces matérielles d'un flux de transfert associé à Google AI Studio : répertoire `.aistudio/artifacts/brain/`, manifeste, patch unifié et archive miroir des fichiers.
+- Le manifeste décrit les changements, leur ordre d'application, les contrôles et les fichiers concernés. Il constitue une trace de travail utile, mais ne prouve pas à lui seul l'auteur humain de chaque ligne ni la titularité juridique de tous les contenus.
+- Le projet `nfv2.zip` contient les fichiers historiques `src/data/phraseBanks.ts`, `phraseBanksExpansionA.ts` et `phraseBanksExpansionB.ts`, ainsi que des registres de sources et de corpus. Ces éléments permettent une comparaison de contenu et de structure avec les versions ultérieures.
+- Le manifeste et la documentation de `nfv2.zip` décrivent une version du projet et un dépôt historique distincts de l'état actuel de `GLLR-Spirit/NameForge`. Ils ne doivent pas être assimilés automatiquement à la version actuellement déployée.
+- `NameForge.Version.2.zip` est un snapshot distinct, dont le README décrit 11 générateurs et 21 archétypes. Il ne contient pas le dossier d'artefacts Google AI Studio ni de métadonnées Git. Il ne peut donc pas être daté par son nom de fichier ni déclaré plus récent sur cette seule base.
+
+### 16.3 Limites techniques des archives
+
+- Aucun répertoire `.git/` n'a été trouvé dans les deux archives. Elles ne contiennent donc pas l'historique Git complet, les objets de commit ni les métadonnées d'auteur/committer qui permettraient de reconstruire toutes les contributions.
+- Aucun enregistrement d'adresse e-mail n'a été trouvé dans les fichiers textuels examinés des deux ZIP. Aucune adresse e-mail de compte n'est reproduite dans ce registre.
+- Aucun motif courant de clé API Google AI Studio ou de jeton GitHub n'a été détecté dans les fichiers textuels analysés. Ce contrôle par motifs ne garantit pas l'absence de tout secret encodé ou obfusqué; les clés doivent rester révoquées/privées et ne jamais être ajoutées au dépôt.
+- Les noms de fichiers arbitraires ou oubliés ne constituent pas un obstacle à l'identification : le contenu, les chemins internes, les manifestes, les empreintes et les correspondances de fichiers sont des critères plus fiables.
+
+### 16.4 Déclaration du propriétaire et attribution souhaitée
+
+Le propriétaire déclare que les deux archives et les comptes utilisés dans le cadre de leur création lui appartiennent. Il demande que l'identité publique de contributeur du projet soit `GLLR-Spirit` uniquement et que les adresses e-mail de ses comptes ne soient pas conservées dans les documents de provenance, les rapports ou les fichiers du projet.
+
+Cette déclaration est consignée comme une déclaration du propriétaire; les ZIP seuls ne permettent pas de vérifier l'identité civile ni la propriété des comptes historiques. Les identifiants de comptes historiques ne sont pas recopiés dans ce registre.
+
+### 16.5 Contrôle de l'historique Git actuel
+
+Une lecture de l'API GitHub sur la branche `main` du dépôt actuel a retourné 128 commits au total (100 sur la première page et 28 sur la deuxième). Pour les 128 commits retournés, le compte auteur lié est `GLLR-Spirit`. Les identités de committer automatisées utilisées par GitHub lors des fusions ne sont pas comptées comme des contributeurs humains distincts.
+
+Ce résultat établit que l'historique de commits actuellement accessible sur `main` est attribué au compte auteur `GLLR-Spirit` dans les réponses GitHub consultées. Il ne prouve pas à lui seul l'origine de chaque contenu importé depuis les archives ni l'absence de contributions antérieures dans des dépôts externes.
+
+Aucune réécriture de l'historique, aucun force-push et aucune modification de `main` n'ont été effectués pendant cet audit. Il n'est pas nécessaire de réécrire l'historique actuel pour obtenir une attribution d'auteur unique sur les 128 commits consultés : GitHub les associe déjà tous à `GLLR-Spirit`.
+
+### 16.6 Décisions et suites
+
+1. Conserver les deux ZIP comme pièces d'audit locales, identifiées par leurs empreintes SHA-256 ci-dessus; ne pas les publier dans le dépôt.
+2. Utiliser `GLLR-Spirit` comme seule identité publique de contributeur dans les nouveaux documents du projet.
+3. Ne pas recopier d'adresse e-mail de compte dans `AUTHORS`, `CONTRIBUTORS`, les registres, les prompts, les exports ou les notices.
+4. Comparer les banques historiques, traductions, données de prénoms et images des archives avec l'état actuel du dépôt, sans réactiver automatiquement les fichiers mis en quarantaine.
+5. Traiter les manifestes Google AI Studio comme preuves de flux de travail et de transfert, et non comme preuve automatique de titularité ou de licence.
+6. Ne pas modifier l'historique Git actuel : l'attribution des 128 commits de `main` est déjà unifiée sous `GLLR-Spirit`.
+
+Cette section ne certifie pas juridiquement la propriété de chaque contenu. Elle consigne les éléments techniques observés, la déclaration du propriétaire et les limites de vérification.
+
+
+### 16.7 Comparaison structurelle entre les deux ZIP
+
+Après retrait du seul préfixe de dossier racine de `NameForge.Version.2.zip`, la comparaison des chemins internes donne :
+
+- 75 fichiers dans `NameForge.Version.2.zip`;
+- 228 fichiers dans `nfv2.zip`;
+- 71 chemins présents dans les deux archives;
+- 11 fichiers identiques octet pour octet parmi ces 71 chemins;
+- 60 chemins communs dont le contenu diffère.
+
+Les 11 fichiers strictement identiques comprennent notamment des fichiers de générateurs, de styles, de tests et de configuration. Les chemins communs mais modifiés comprennent notamment des composants d'interface, des modules i18n, des générateurs et des scripts SEO.
+
+Cette comparaison confirme une parenté technique entre les deux snapshots, mais pas leur ordre chronologique. Le nombre de fichiers, les noms des archives et les différences de contenu ne suffisent pas à dater précisément chaque snapshot. Le manifeste de transfert contenu dans `nfv2.zip` décrit une opération par rapport à un commit de référence historique, mais il ne prouve pas que `NameForge.Version.2.zip` est exactement ce commit de base.
+
+Aucune fusion automatique des deux archives n'est justifiée. Pour toute réutilisation, comparer les fichiers individuellement avec le dépôt actuel, conserver les empreintes et examiner les différences avant intégration.
+
+
+## 17. Comparaison des archives avec `main` — 2026-11-20
+
+### 17.1 Méthode
+
+Les fichiers des deux ZIP ont été extraits en lecture seule. Pour chaque fichier, une empreinte Git blob SHA-1 a été calculée sur les octets exacts (en-tête Git `blob <taille>\0` inclus), puis comparée à l'empreinte du blob correspondant dans l'arbre GitHub de `main` au commit `aaaf61ff42516435ddbeb493aa4e83a7d74a8c2e`. Une empreinte identique établit une identité octet par octet; une empreinte différente établit seulement que les octets diffèrent, pas que le contenu est juridiquement tiers ou original.
+
+### 17.2 Banques de phrases historiques
+
+Dans `nfv2.zip`, les trois fichiers historiques suivants sont présents :
+
+- `src/data/phraseBanks.ts` — 177 745 octets;
+- `src/data/phraseBanksExpansionA.ts` — 67 842 octets;
+- `src/data/phraseBanksExpansionB.ts` — 59 455 octets.
+
+Dans `main`, seul `src/data/phraseBanks.ts` existe à ce chemin; il s'agit d'un fichier de quarantaine de 972 octets, dont l'empreinte diffère de celle du fichier historique. Les deux fichiers d'expansion ne sont pas présents dans l'arbre actuel. Le fichier actif de `main` expose une liste vide de banques approuvées et retourne une liste vide de phrases; les 19 identifiants historiques sont explicitement placés en quarantaine.
+
+Conséquence : les archives contiennent des copies historiques des banques, mais elles ne constituent pas une autorisation de les remettre en production. Le manifeste de transfert Google AI Studio ne fournit pas de provenance d'auteur ou de licence entrée par entrée pour ces banques. Elles restent non vérifiées et doivent rester hors runtime jusqu'à preuve suffisante.
+
+### 17.3 Images et ressources graphiques
+
+Les sept images présentes dans `nfv2.zip` correspondent toutes, octet pour octet, aux sept images de `main` :
+
+| Fichier | Taille dans l'archive | Résultat |
+|---|---:|---|
+| `public/images/icon-180.png` | 36 831 octets | Identique à `main` |
+| `public/images/icon-192.png` | 41 351 octets | Identique à `main` |
+| `public/images/icon-32.png` | 1 783 octets | Identique à `main` |
+| `public/images/icon-512.png` | 264 891 octets | Identique à `main` |
+| `public/images/nameforge-logo.jpg` | 454 191 octets | Identique à `main` |
+| `public/images/og-image.jpg` | 32 379 octets | Identique à `main` |
+| `src/assets/images/nameforge-logo-128.png` | 44 208 octets | Identique à `main` |
+
+Cette identité établit la continuité des fichiers entre l'archive et le dépôt actuel, mais ne prouve pas qui les a créés ni les droits sur les éléments graphiques éventuellement incorporés. Les métadonnées d'image inspectées ne fournissent pas d'auteur ou de licence exploitable.
+
+Dans `NameForge.Version.2.zip`, `public/images/nameforge-logo.jpg` est également identique à la version de `main`. Le fichier homonyme `public/images/nameforge-logo.png` contient exactement les mêmes octets, mais ses octets sont encodés au format JPEG malgré l'extension `.png`. Cette extension trompeuse doit être corrigée si ce snapshot est réutilisé.
+
+La même archive contient aussi `src/assets/images/82a33697-4af9-41fd-ae0a-940c4c556c06.png`, une image carrée de 1254 × 1254 pixels, absente de l'arbre actuel de `main`. Aucun auteur, source, outil ou licence n'est identifiable dans ses métadonnées intégrées. Son nom UUID n'est pas une preuve de provenance. Ne pas la réintégrer avant d'avoir retrouvé le fichier source/export et confirmé les droits sur l'image.
+
+### 17.4 Modules de traduction et d'interface
+
+`nfv2.zip` contient les 29 fichiers de `src/i18n/` présents dans `main`. Vingt-huit sont identiques octet par octet. Le seul fichier différent est `src/i18n/moduleLabels.ts`; l'inspection des fins de fichier montre que la copie de l'archive comporte un saut de ligne final supplémentaire. Le contenu utile des deux fichiers est par ailleurs identique selon la comparaison effectuée.
+
+Cela établit que les modules de traduction/interface actuels sont présents dans l'archive de transfert et que leur copie correspond à celle de `main`, à l'exception de ce saut de ligne final. Cela ne démontre pas qui a rédigé ou traduit les chaînes, ni si des traductions externes ont été incorporées. Les 29 modules restent soumis à une vérification de méthode et d'éventuelles contributions de tiers.
+
+`NameForge.Version.2.zip` contient 15 modules `src/i18n/`. Un seul, `extraLanguages.ts`, est identique à `main`; les 14 autres ont des octets différents. Ce snapshot n'inclut donc pas une copie exacte de l'ensemble des modules actuels. En l'absence d'historique Git ou d'un identifiant de commit fiable dans cette archive, il n'est pas possible de déterminer son ordre chronologique par rapport à `nfv2.zip` ou à `main`.
+
+### 17.5 Conclusion de provenance
+
+- **Banques :** copies historiques retrouvées; origine et droits toujours non établis; quarantaine maintenue.
+- **Images :** continuité binaire des sept images de `nfv2.zip` vers `main` établie; auteur et droits non établis.
+- **Image UUID de l'autre ZIP :** absente de `main`; source et droits non établis.
+- **Traductions :** correspondance presque complète entre `nfv2.zip` et `main`; attribution humaine et méthode de traduction non établies.
+- **Archives :** elles apportent des preuves de possession de copies et de continuité technique, pas une preuve autonome de titularité juridique.
+
+Aucun fichier applicatif, image ou traduction n'a été modifié par cette comparaison. Aucune banque n'a été restaurée. La branche `main` n'a pas été modifiée.
