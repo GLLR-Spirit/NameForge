@@ -357,3 +357,45 @@ Ces éléments doivent être fournis par le propriétaire du projet ou par les c
 5. Refaire l'audit des bundles de production après intégration de la quarantaine de la PR #6.
 6. Ne choisir une licence globale pour NameForge qu'après clarification des droits sur le code, les contenus, les traductions et les médias.
 
+
+
+---
+
+## 15. Mise à jour après fusion des PR #4, #5 et #6 — 2026-11-20
+
+Cette section prévaut sur les passages historiques antérieurs qui décrivent les PR comme ouvertes ou la quarantaine comme non fusionnée.
+
+### 15.1 État technique désormais constaté dans `main`
+
+- Les PR #4 (registre des droits), #5 (migration SEO/Cloudflare) et #6 (quarantaine des banques de phrases) sont fermées et fusionnées.
+- Le commit de référence actuel vérifié est `aaaf61ff42516435ddbeb493aa4e83a7d74a8c2e`.
+- La PR #6 a retiré les banques éditoriales non vérifiées du chemin runtime actif et ajouté une documentation de quarantaine dans `docs/legal/quarantine/phrase-banks.md`.
+- Les anciennes versions des banques demeurent dans l'historique Git. La fusion n'a pas réécrit l'historique.
+- La validation GitHub Actions du commit `aaaf61f` a réussi : installation Chromium, audit npm, type-check, tests de régression, audit i18n, build, Playwright et Lighthouse.
+- Le check Cloudflare consulté indique un déploiement réussi avec une URL de prévisualisation. Ce résultat ne constitue pas, à lui seul, une preuve que l'URL de production `https://nameforge-bhk.pages.dev/` sert le commit courant. La production doit être vérifiée séparément par une requête HTTP et un contrôle de contenu/empreinte.
+
+### 15.2 Correction de statut des banques de phrases
+
+Les paragraphes précédents qui indiquent que les banques sont encore importées dans `main`, que la PR #6 est ouverte ou que le correctif n'est pas appliqué à `main` décrivent un état historique antérieur à la fusion. Ils ne décrivent plus l'état actuel du dépôt.
+
+La situation actuelle est la suivante : les banques concernées sont mises en quarantaine dans la branche principale et ne doivent pas être réactivées tant que leur provenance, leur auteur, leur licence ou autorisation et leurs obligations d'attribution ne sont pas documentés et vérifiés. Cette mesure technique ne prouve ni une violation ni la titularité des droits.
+
+### 15.3 Éléments juridiques qui restent non établis
+
+La fusion du registre et de la quarantaine ne crée aucune preuve de propriété et ne complète pas les pièces manquantes. Restent notamment à documenter :
+
+1. Les sources, auteurs, éventuels prompts/exports IA et conditions d'utilisation applicables aux banques de phrases historiques.
+2. Les sources et références par entrée pour les prénoms et affirmations étymologiques.
+3. Les auteurs, sources et méthodes de rédaction/traduction des 29 modules i18n.
+4. Les fichiers de travail, auteurs, ressources incorporées, licences, achats ou autorisations pour les sept images recensées et tout autre média.
+5. Les sources, versions, licences et obligations des corpus lexicaux, catégories, références katakana et enrichissements syllabiques.
+6. Les notices des versions exactes des dépendances npm/Rust, les artefacts réellement distribués et les notices à joindre.
+7. L'historique de création et les contributions tierces au code avant de choisir une licence globale.
+
+Aucune donnée d'auteur, licence, permission, prompt ou source ne doit être inventée pour remplir les champs manquants. En l'absence de pièce, conserver explicitement le statut « non vérifié » et ne pas présenter le contenu concerné comme propriété exclusive ou librement redistribuable.
+
+### 15.4 Prochaine étape probante
+
+Le propriétaire du projet et, le cas échéant, les contributeurs doivent fournir les éléments de preuve disponibles : fichiers sources datés, exports, historiques de travail, factures/licences, autorisations écrites, URL et versions des corpus, noms/coordonnées des créateurs avec leur accord, et notices des dépendances. Chaque pièce doit être rattachée à un élément précis du registre. Les éléments non justifiables devront rester exclus du runtime/publication ou être remplacés par des créations nouvelles et traçables.
+
+Cette mise à jour est documentaire. Elle ne modifie pas les données applicatives, les images, les licences du projet ni la visibilité du dépôt.
