@@ -126,3 +126,37 @@ Une réponse rétrospective du propriétaire doit être identifiée comme **déc
 - Aucune banque n'a été réintégrée dans `main`.
 - Aucune licence n'a été ajoutée ou modifiée.
 - La branche `main` reste inchangée.
+
+
+## 10. Recherche complémentaire de conversations, exports et brouillons — 2026-11-20
+
+Une recherche complémentaire a été effectuée dans les fichiers de conversation et la bibliothèque de fichiers accessibles, avec des requêtes portant notamment sur `phraseBanks.ts`, `phraseBanksExpansionA.ts`, `phraseBanksExpansionB.ts`, les noms des familles et les termes ChatGPT/prompt/génération.
+
+### Résultats retrouvés
+
+- Des captures de terminal et journaux de préparation d'intégration datés du 20 novembre 2026 montrent que les trois fichiers de banques étaient présents dans le projet importé et suivis par Git. Ces éléments corroborent l'existence et l'intégration technique des fichiers, pas la manière dont les phrases ont été créées.
+- Des documents de travail NameForge retrouvés dans la bibliothèque contiennent du code de générateurs et des échanges de conception du site. Les extraits examinés ne contiennent pas de prompts de génération des 19 banques ni de correspondance entre prompts et familles.
+- La recherche de contexte des conversations antérieures n'a pas fait ressortir de conversation retrouvée décrivant la génération de ces banques, ni de prompt, export ChatGPT ou brouillon relié à une famille précise.
+- Les archives `nfv2.zip` et `NameForge.Version.2.zip` ont déjà été examinées dans le présent audit. Le dossier `.aistudio` de `nfv2.zip` contient un manifeste de transfert, un patch et une archive compagnon, mais pas de transcript de prompts ou d'historique de conversation.
+
+### Limite de la recherche
+
+Ce résultat signifie uniquement qu'aucune pièce probante n'a été retrouvée dans les éléments actuellement accessibles et indexés. Il ne démontre pas que les conversations n'existent plus ou qu'elles n'ont jamais existé. Les historiques ChatGPT non exportés ou non présents dans les fichiers accessibles ne peuvent pas être inspectés directement par cet audit.
+
+### Tableau de traçabilité après cette recherche
+
+| Élément recherché | Résultat | Valeur probante |
+|---|---|---|
+| Conversations ChatGPT précises | Non retrouvées dans les éléments accessibles | Aucune corroboration directe supplémentaire |
+| Prompts associés aux 19 familles | Non retrouvés | Aucun lien prompt-famille établi |
+| Exports de conversations | Aucun export pertinent retrouvé | Aucune corroboration directe supplémentaire |
+| Brouillons de phrases sources | Aucun brouillon pertinent retrouvé | Aucune comparaison brouillon-corpus possible |
+| Journaux Git/terminal et inventaires de fichiers | Retrouvés | Corroborent l'existence et le transfert des fichiers, pas leur auteur ni leur méthode de génération |
+| Documentation I18N | Déjà identifiée | Déclaration documentaire sur la génération IA des traductions |
+| Déclaration du propriétaire | Recueillie dans cette conversation | Déclare une génération IA majoritaire, principalement ChatGPT, sans ventilation par famille |
+
+### Décision de provenance mise à jour
+
+La déclaration du propriétaire demeure la seule indication disponible concernant l'usage de ChatGPT pour la majorité des phrases originales. La recherche complémentaire n'a pas permis de la corroborer par des conversations ou prompts contemporains. Le statut reste donc : **génération IA déclarée par le propriétaire pour la majorité du texte source; corroboration indépendante et attribution par famille non disponibles**.
+
+Aucun contenu des banques n'a été modifié ou réintégré. Aucune modification n'a été apportée à la branche `main`.
