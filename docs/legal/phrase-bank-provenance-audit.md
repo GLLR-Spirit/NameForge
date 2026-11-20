@@ -259,3 +259,29 @@ Un journal de terminal archivé contient notamment les résultats suivants : `Ex
 - **Décision maintenue : ne pas réintégrer les 19 banques dans la version publique à ce stade.**
 
 Les archives ont été examinées en lecture seule. Aucun fichier de banque, code applicatif, branche `main` ou déploiement n'a été modifié par cette passe.
+
+
+## 13. Contrôle Web exploratoire de collisions exactes — échantillon limité — 2026-11-20
+
+Un contrôle Web exploratoire a été réalisé sur cinq formulations anglaises exactes extraites des banques, choisies dans plusieurs familles. Ce contrôle n'est **pas** une recherche exhaustive des 10 696 chaînes, ni une expertise de similarité, ni une preuve d'emprunt. Il sert uniquement à repérer des collisions publiques qui méritent une vérification avant publication.
+
+| Formulation exacte dans NameForge | Famille | Résultat public repéré | Interprétation prudente |
+|---|---|---|---|
+| `The Ember Chronicles` | `novel_series` | Google Books référence un livre publié en 2025 intitulé *Ashes of the Fallen: The Ember Chronicles*, volume 1 d'une série. URL : https://books.google.com/books/about/Ashes_of_the_Fallen.html?id=vPiz0QEACAAJ | Collision exacte de titre/sous-titre. Cela ne prouve pas que la banque a copié le livre; la date de création de l'entrée NameForge n'est pas établie. À examiner comme nom de série déjà utilisé. |
+| `Velvet Static` | `band_name` | Plusieurs pages publiques décrivent des groupes/artistes utilisant ce nom, notamment Bandcamp et des pages de groupes. URLs : https://brainrotrecordsworldwide.bandcamp.com/album/i ; https://radiowigwam.co.uk/bands/velvet-static/ | Collision exacte avec des usages musicaux publics. Risque pratique de confusion de nom à examiner; aucune preuve de copie de la formulation. |
+| `The Gilded Flagon` | `tavern` | Un générateur public de noms de tavernes cite explicitement cette formulation comme exemple de nom classique de taverne. URL : https://namecraftforge.com/generators/tavern | Collision exacte dans le même domaine créatif. La formulation peut être une construction conventionnelle; la page ne démontre pas l'origine de l'entrée NameForge. |
+| `The Copper Lantern Inn` | `hotel_name` | Une publication PDF d'annuaire local ancien répertorie un établissement portant ce nom. URL : https://thayerfamilies.org/media/804c6d6b-45a9-4e78-aeff-4eb4f922a413/publications/209/Fall2004.pdf | Collision exacte avec un nom d'établissement public antérieur à l'archive actuelle. Cela ne démontre pas une reprise, mais montre que le nom n'est pas exclusif au projet. |
+| `Operation Silent Harbor` | `tactical_operation` | Aucun résultat public probant n'a été retenu dans cette passe. | Absence de résultat dans cette recherche ponctuelle; aucune conclusion d'originalité. |
+
+### Portée et limites
+
+- Cinq formulations seulement ont été testées, et les résultats peuvent varier selon les moteurs, l'indexation, la langue et la date.
+- Une correspondance de chaîne ne prouve pas à elle seule une copie, une contrefaçon ou une source d'inspiration.
+- Une absence de résultat ne prouve pas l'originalité.
+- Les noms courts et descriptifs peuvent être utilisés indépendamment par plusieurs personnes.
+- Les questions de disponibilité de marque, de nom commercial, de domaine et de confusion commerciale sont distinctes de la question de droit d'auteur.
+- Aucun lien de source ou d'antériorité n'a été ajouté aux données des banques; aucune formulation n'a été supprimée ou réécrite à la suite de cet échantillon.
+
+### Conséquence
+
+Cet échantillon confirme qu'au moins certaines formulations sont déjà utilisées publiquement ailleurs. Il renforce la nécessité d'un contrôle par entrée avant de revendiquer une exclusivité ou de commercialiser les banques, mais ne permet pas de conclure que les formulations ont été copiées. La décision de quarantaine reste inchangée.
