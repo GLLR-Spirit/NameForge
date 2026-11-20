@@ -99,45 +99,30 @@ for (const item of ATTESTED_BABY_NAMES) {
   }
 }
 
-// 5. Curated phrase banks: slogans, book titles and song titles exist natively in all 25 languages
-const { getPhraseBank, PHRASE_BANK_GENERATORS } = await import('../data/phraseBanks');
+// 5. Unverified phrase banks are quarantined from runtime pending provenance review.
+const { getPhraseBank, PHRASE_BANK_GENERATORS, QUARANTINED_PHRASE_BANK_GENERATORS } = await import('../data/phraseBanks');
 const ALL_LANGS = ['en','fr','es','de','it','pt','ar','tr','ja','ko','zh','ru','hi','nl','pl','sv','vi','id','th','el','he','cs','ro','da','fi','uk','bn','nb'];
-// 5a. Videogame phrase banks are expanded and remain bounded by distinct native phrases.
-for (const lang of ALL_LANGS) {
-  const bank = getPhraseBank('videogame', lang);
-  const names = generateNames({
-    generator: 'videogame' as any,
-    genLanguage: lang as any,
-    quantity: 40,
-    seed: `videogame-bank-capacity-${lang}`,
-  });
-  const unique = new Set(names.map((item) => item.name.normalize('NFC').toLocaleLowerCase()));
-  check(`Videogame ${lang} has expanded phrase bank`, bank.length >= 21, `(got ${bank.length})`);
-  check(`Videogame ${lang} returns only distinct curated names`, names.length === bank.length && unique.size === names.length && names.every((item) => bank.includes(item.name)), `(bank=${bank.length}, returned=${names.length}, unique=${unique.size})`);
-}
-
-// 5b. Shop banks are intentionally bounded: a large request must return the
-// available distinct curated names, never pad the result with duplicates.
-for (const lang of ALL_LANGS) {
-  const bank = getPhraseBank('shop', lang);
-  const names = generateNames({
-    generator: 'shop' as any,
-    genLanguage: lang as any,
-    quantity: 30,
-    seed: `shop-bank-capacity-${lang}`,
-  });
-  const unique = new Set(names.map((item) => item.name.normalize('NFC').toLocaleLowerCase()));
-  check(`Shop ${lang} returns only distinct curated names when request exceeds bank`, names.length === bank.length && unique.size === names.length && names.every((item) => bank.includes(item.name)), `(bank=${bank.length}, returned=${names.length}, unique=${unique.size})`);
-}
-
-for (const generatorId of PHRASE_BANK_GENERATORS) {
+check('No unverified phrase banks are registered for runtime', PHRASE_BANK_GENERATORS.length === 0);
+check('All previously integrated phrase-bank categories are recorded for quarantine', QUARANTINED_PHRASE_BANK_GENERATORS.length === 19);
+for (const generatorId of QUARANTINED_PHRASE_BANK_GENERATORS) {
   for (const lang of ALL_LANGS) {
-    const bank = getPhraseBank(generatorId, lang);
-    check(`Phrase bank ${generatorId}/${lang} has at least 10 phrases`, bank.length >= 10, `(got ${bank.length})`);
-    check(`Phrase bank ${generatorId}/${lang} has unique phrases`, new Set(bank).size === bank.length);
+    check(`Quarantined phrase bank ${generatorId}/${lang} returns no unverified content`, getPhraseBank(generatorId, lang).length === 0);
+  }
+}
+
+// Phrase-based generator categories must continue through the procedural fallback.
+for (const generatorId of ['videogame', 'shop']) {
+  for (const lang of ALL_LANGS) {
     for (const k of Object.keys(memory)) delete memory[k];
-    const names = generateNames({ generator: generatorId as any, genLanguage: lang as any, quantity: 5 });
-    check(`Generation ${generatorId}/${lang} returns native phrases`, names.length === Math.min(5, bank.length) && names.every((n) => bank.includes(n.name)));
+    const names = generateNames({
+      generator: generatorId as any,
+      genLanguage: lang as any,
+      quantity: 5,
+      seed: `quarantine-fallback-${generatorId}-${lang}`,
+    });
+    const normalized = names.map((item) => item.name.normalize('NFC').toLocaleLowerCase());
+    check(`Procedural fallback ${generatorId}/${lang} returns results`, names.length > 0);
+    check(`Procedural fallback ${generatorId}/${lang} returns distinct names`, new Set(normalized).size === names.length);
   }
 }
 
