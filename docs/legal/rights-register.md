@@ -35,6 +35,8 @@
 
 Les trois banques `phraseBanks.ts`, `phraseBanksExpansionA.ts` et `phraseBanksExpansionB.ts` sont importées par le moteur. Leur entrée de manifeste n'est pas une barrière effective contre ces imports directs. Une éventuelle mise en quarantaine exige une modification du chemin d'import et des tests de non-régression; aucune modification de runtime n'est faite par ce registre.
 
+**Précision sur le contrôle effectif :** `isDatasetEligibleForRuntime()` exige notamment `status === 'approved'`, `runtimeEnabled === true`, une licence et une attribution renseignées, une URL HTTPS, une version et des obligations documentées, ainsi qu'un statut de redistribution différent de `restricted-or-unverified`. Le manifeste marque actuellement les banques éditoriales `editorial-unverified` et `restricted-or-unverified`; elles ne satisfont donc pas ce contrôle, même si leur champ `runtimeEnabled` vaut `true`. Le test `src/tests/datasetManifest.test.ts` vérifie explicitement qu'elles ne sont pas éligibles et qu'elles ne figurent pas dans la liste des sources runtime approuvées. Cela ne neutralise toutefois pas les imports directs des fichiers de banques dans le moteur : le contrôle de manifeste et le chemin d'import runtime sont deux mécanismes distincts.
+
 ## 3. Traductions et contenus localisés
 
 | Fichiers / ensemble | Constat | Provenance / droits | Décision provisoire |
@@ -215,7 +217,7 @@ Conséquence : pour les fichiers binaires et modules dont l'historique antérieu
 
 
 
-## 10. Compléments de vérification — inventaire exact du dépôt
+## 13. Compléments de vérification — inventaire exact du dépôt
 
 Contrôle complémentaire effectué le 2026-11-20 sur l'arbre Git récursif de `main` (255 entrées, réponse non tronquée).
 
@@ -278,7 +280,7 @@ Ces métadonnées proviennent du lockfile; elles ne remplacent pas les textes de
 
 Le précédent tableau décrivait 276 entrées npm. Le contrôle direct du lockfile actuellement sur `main` compte 277 entrées. Ce chiffre est la référence de ce complément. Il peut évoluer à chaque changement de dépendances; régénérer l'inventaire après toute mise à jour de `package-lock.json`.
 
-## 11. Plan d'exécution restant
+## 14. Plan d'exécution restant
 
 1. **Images** : obtenir les fichiers originaux et les preuves de création/achat/licence; examiner visuellement chaque fichier et ses métadonnées; remplacer seulement ceux qui restent non justifiables.
 2. **Banques A/B et base** : reconstruire la provenance depuis les historiques, les fichiers de travail, exports IA et conversations/outils éventuellement conservés. Une provenance inconnue reste explicitement inconnue; ne pas fabriquer une déclaration rétroactive.
