@@ -144,8 +144,10 @@ function run() {
   const animeKo = getGeneratorCompatibilityAssessment('anime', 'ko', 'en');
   assert.equal(animeKo.level, 'limited-resources');
 
+  // Unverified phrase banks are quarantined, so this category now uses the procedural profile.
   const sloganTh = getGeneratorCompatibilityAssessment('slogan', 'th', 'en');
-  assert.equal(sloganTh.level, 'highly-compatible');
+  assert.equal(resolveGeneratorCompatibilityDomain('slogan'), 'business');
+  assert.equal(sloganTh.level, 'limited-resources');
 
   const valkyrieNordic = getGeneratorCompatibilityAssessment('nordic_valkyrie', 'nordic', 'en');
   assert.equal(valkyrieNordic.level, 'highly-compatible');
