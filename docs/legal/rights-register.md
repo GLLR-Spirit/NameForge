@@ -453,3 +453,20 @@ Aucune réécriture de l'historique, aucun force-push et aucune modification de 
 6. Ne pas modifier l'historique Git actuel : l'attribution des 128 commits de `main` est déjà unifiée sous `GLLR-Spirit`.
 
 Cette section ne certifie pas juridiquement la propriété de chaque contenu. Elle consigne les éléments techniques observés, la déclaration du propriétaire et les limites de vérification.
+
+
+### 16.7 Comparaison structurelle entre les deux ZIP
+
+Après retrait du seul préfixe de dossier racine de `NameForge.Version.2.zip`, la comparaison des chemins internes donne :
+
+- 75 fichiers dans `NameForge.Version.2.zip`;
+- 228 fichiers dans `nfv2.zip`;
+- 71 chemins présents dans les deux archives;
+- 11 fichiers identiques octet pour octet parmi ces 71 chemins;
+- 60 chemins communs dont le contenu diffère.
+
+Les 11 fichiers strictement identiques comprennent notamment des fichiers de générateurs, de styles, de tests et de configuration. Les chemins communs mais modifiés comprennent notamment des composants d'interface, des modules i18n, des générateurs et des scripts SEO.
+
+Cette comparaison confirme une parenté technique entre les deux snapshots, mais pas leur ordre chronologique. Le nombre de fichiers, les noms des archives et les différences de contenu ne suffisent pas à dater précisément chaque snapshot. Le manifeste de transfert contenu dans `nfv2.zip` décrit une opération par rapport à un commit de référence historique, mais il ne prouve pas que `NameForge.Version.2.zip` est exactement ce commit de base.
+
+Aucune fusion automatique des deux archives n'est justifiée. Pour toute réutilisation, comparer les fichiers individuellement avec le dépôt actuel, conserver les empreintes et examiner les différences avant intégration.
