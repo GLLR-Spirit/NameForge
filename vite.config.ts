@@ -8,11 +8,14 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: './',
   server: {
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     port: 3000,
-    allowedHosts: true,
+    strictPort: true,
   },
   build: {
+    // Do not publish browser source maps: shipped client code is still inspectable.
+    sourcemap: false,
+    minify: 'esbuild',
     chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {

@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: 22
       - name: Install Node dependencies
-        run: npm install
+        run: npm ci
       - name: Run Rust unit tests
         run: cargo test --manifest-path rust/Cargo.toml --all-targets
       - name: Build optimized Rust benchmark binary
