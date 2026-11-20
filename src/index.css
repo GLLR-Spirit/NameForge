@@ -1,0 +1,212 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Global foundation layer for NameForge.
+   Theme variables live in ./styles/tokens.css; layout primitives live in ./styles/layout.css. */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+    scrollbar-gutter: stable;
+    text-rendering: optimizeLegibility;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    min-height: 100vh;
+    overflow-x: hidden;
+    color: var(--nf-ink);
+    background-color: var(--nf-page-bg);
+    line-height: 1.55;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Subtle atmospheric gradient exclusively in dark mode */
+  html.dark body {
+    background-image:
+      radial-gradient(circle at 12% 0%, rgba(99, 102, 241, 0.14), transparent 34%),
+      radial-gradient(circle at 88% 6%, rgba(56, 189, 248, 0.10), transparent 30%);
+    background-attachment: fixed;
+  }
+
+  [dir="rtl"] {
+    text-align: start;
+  }
+
+  [lang="ar"],
+  [lang="fa"],
+  [lang="ur"],
+  [lang="ps"] {
+    font-family: "Noto Naskh Arabic", "Noto Sans Arabic", "Segoe UI", Tahoma, Arial, system-ui, sans-serif;
+  }
+
+  [lang="he"] {
+    font-family: "Noto Sans Hebrew", "Arial Hebrew", "Segoe UI", Arial, system-ui, sans-serif;
+  }
+
+  [dir="rtl"] code,
+  [dir="rtl"] pre,
+  [dir="rtl"] kbd,
+  [dir="rtl"] .font-mono,
+  [dir="rtl"] .nf-bidi-ltr {
+    direction: ltr;
+    unicode-bidi: isolate;
+    text-align: left;
+  }
+
+  .nf-bidi-isolate {
+    unicode-bidi: isolate;
+  }
+
+  [dir="rtl"] .text-left {
+    text-align: right;
+  }
+
+  [dir="rtl"] .text-right {
+    text-align: left;
+  }
+
+  html.text-size-compact { font-size: 14px; }
+  html.text-size-normal { font-size: 16px; }
+  html.text-size-large { font-size: 18px; }
+
+  :where(a, button, input, select, textarea, [role="button"], [tabindex]):focus-visible {
+    outline: 2px solid var(--nf-primary);
+    outline-offset: 2px;
+  }
+
+  :where(button, a, input, select, textarea) {
+    -webkit-tap-highlight-color: transparent;
+    font: inherit;
+  }
+
+  ::selection {
+    background: var(--nf-primary-soft);
+    color: inherit;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  img, canvas, svg, video {
+    max-width: 100%;
+  }
+
+  input, select, textarea {
+    max-width: 100%;
+  }
+
+  /* Consistent direction-aware native select affordance */
+  select:not([multiple]) {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    min-width: 0;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1rem 1rem;
+    padding-inline-end: 2.5rem;
+  }
+
+  html.light select:not([multiple]) {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23475569' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  }
+
+  [dir="rtl"] select:not([multiple]) {
+    background-position: left 0.75rem center;
+    padding-inline-start: 2.5rem;
+    padding-inline-end: 0.75rem;
+  }
+
+  select[multiple] {
+    -webkit-appearance: auto;
+    -moz-appearance: auto;
+    appearance: auto;
+    background-image: none;
+    min-height: 8rem;
+  }
+
+  select option,
+  select optgroup {
+    background-color: var(--nf-surface);
+    color: var(--nf-ink);
+  }
+
+  button {
+    -webkit-appearance: button;
+    touch-action: manipulation;
+  }
+
+  @media (max-width: 640px) {
+    select:not([multiple]) {
+      min-height: 2.75rem;
+      font-size: max(0.875rem, 16px);
+    }
+  }
+}
+
+/* Unlayered reduced-motion governance: overrides all Tailwind utilities, transforms, spins, and root smooth scroll */
+html.reduce-motion {
+  scroll-behavior: auto !important;
+}
+
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0ms !important;
+  scroll-behavior: auto !important;
+}
+
+html.reduce-motion .animate-spin,
+html.reduce-motion .animate-pulse,
+html.reduce-motion .animate-bounce,
+html.reduce-motion .animate-fade-in {
+  animation: none !important;
+}
+
+html.reduce-motion [class*="hover:-translate"]:hover,
+html.reduce-motion [class*="hover:translate"]:hover,
+html.reduce-motion [class*="hover:scale"]:hover,
+html.reduce-motion .group:hover [class*="group-hover:scale"],
+html.reduce-motion .group:hover [class*="group-hover:translate"] {
+  transform: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin,
+  .animate-pulse,
+  .animate-bounce,
+  .animate-fade-in {
+    animation: none !important;
+  }
+
+  [class*="hover:-translate"]:hover,
+  [class*="hover:translate"]:hover,
+  [class*="hover:scale"]:hover,
+  .group:hover [class*="group-hover:scale"],
+  .group:hover [class*="group-hover:translate"] {
+    transform: none !important;
+  }
+}

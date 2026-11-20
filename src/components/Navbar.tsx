@@ -1,0 +1,443 @@
+import React, { useEffect, useState } from 'react';
+import { useGeneratorLocalization } from '../hooks/useGeneratorLocalization';
+import { Bookmark, Menu, X, ChevronDown, Settings, Globe, Dices, Wand2 } from 'lucide-react';
+import { ALL_GENERATORS_LIST, GENERATOR_FAMILIES_CONFIG } from '../data/generators';
+import { GeneratorId } from '../types';
+import { getSavedNames, subscribeToStorage } from '../services/storage';
+import { Logo } from './Logo';
+import { SettingsModal } from './SettingsModal';
+import { LanguageSelectorModal } from './LanguageSelectorModal';
+import { getAppSettings, subscribeToSettings, SUPPORTED_LANGUAGES } from '../services/settings';
+import { getTranslations } from '../i18n';
+import { getShellLabels } from '../i18n/shell';
+
+interface NavbarProps {
+  currentView: string;
+  currentGenerator?: GeneratorId;
+  onNavigate: (view: string, generatorId?: GeneratorId | string) => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({
+  currentView,
+  currentGenerator,
+  onNavigate,
+}) => {
+  const { title: getLocalizedGeneratorTitle, shortTitle: getLocalizedGeneratorShortTitle, description: getLocalizedGeneratorDescription } = useGeneratorLocalization();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [generatorsDropdownOpen, setGeneratorsDropdownOpen] = useState(false);
+  const [showLangModal, setShowLangModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
+  const [settings, setSettings] = useState(getAppSettings());
+
+  const t = getTranslations(settings.language).nav;
+  const navCopy: Record<string, { catalog: string; random: string; randomTitle: string; studio: string; mobileRandom: string; mobileStudio: string; menu: string; language: string; languages: string; all: string; generators: string; families: Record<string, string> }> = {
+    en: { catalog: 'Catalog', random: 'Random', randomTitle: 'Open a random generator', studio: 'Style Studio', mobileRandom: 'Random generator (🎲 Surprise me)', mobileStudio: 'Style Studio (Unicode & HD Canvas)', menu: 'Menu', language: 'Language:', languages: 'languages', all: 'All', generators: 'NameForge generators', families: { fantasy: 'Fantasy & Myth', business: 'Business & Projects', creative: 'Creative & Media', innovation: 'Innovation & Tech' } },
+    fr: { catalog: 'Catalogue', random: 'Aléatoire', randomTitle: 'Ouvrir un générateur aléatoire', studio: 'Atelier de style', mobileRandom: 'Générateur aléatoire (🎲 Surprenez-moi)', mobileStudio: 'Atelier de style (Unicode et Canvas HD)', menu: 'Menu', language: 'Langue :', languages: 'langues', all: 'Tous', generators: 'générateurs NameForge', families: { fantasy: 'Fantasy et mythes', business: 'Entreprises et projets', creative: 'Création et médias', innovation: 'Innovation et technologie' } },
+    es: { catalog: 'Catálogo', random: 'Aleatorio', randomTitle: 'Abrir un generador aleatorio', studio: 'Estudio de estilo', mobileRandom: 'Generador aleatorio (🎲 Sorpréndeme)', mobileStudio: 'Estudio de estilo (Unicode y Canvas HD)', menu: 'Menú', language: 'Idioma:', languages: 'idiomas', all: 'Todos', generators: 'generadores NameForge', families: { fantasy: 'Fantasía y mitos', business: 'Empresas y proyectos', creative: 'Creación y medios', innovation: 'Innovación y tecnología' } },
+    de: { catalog: 'Katalog', random: 'Zufällig', randomTitle: 'Zufälligen Generator öffnen', studio: 'Stil-Studio', mobileRandom: 'Zufälliger Generator (🎲 Überrasch mich)', mobileStudio: 'Stil-Studio (Unicode und HD-Canvas)', menu: 'Menü', language: 'Sprache:', languages: 'Sprachen', all: 'Alle', generators: 'NameForge-Generatoren', families: { fantasy: 'Fantasy und Mythen', business: 'Unternehmen und Projekte', creative: 'Kreatives und Medien', innovation: 'Innovation und Technik' } },
+    it: { catalog: 'Catalogo', random: 'Casuale', randomTitle: 'Apri un generatore casuale', studio: 'Studio di stile', mobileRandom: 'Generatore casuale (🎲 Sorprendimi)', mobileStudio: 'Studio di stile (Unicode e Canvas HD)', menu: 'Menu', language: 'Lingua:', languages: 'lingue', all: 'Tutti', generators: 'generatori NameForge', families: { fantasy: 'Fantasy e miti', business: 'Aziende e progetti', creative: 'Creatività e media', innovation: 'Innovazione e tecnologia' } },
+    pt: { catalog: 'Catálogo', random: 'Aleatório', randomTitle: 'Abrir um gerador aleatório', studio: 'Estúdio de estilo', mobileRandom: 'Gerador aleatório (🎲 Surpreenda-me)', mobileStudio: 'Estúdio de estilo (Unicode e Canvas HD)', menu: 'Menu', language: 'Idioma:', languages: 'idiomas', all: 'Todos', generators: 'geradores NameForge', families: { fantasy: 'Fantasia e mitos', business: 'Empresas e projetos', creative: 'Criação e mídia', innovation: 'Inovação e tecnologia' } },
+    nl: { catalog: 'Catalogus', random: 'Willekeurig', randomTitle: 'Open een willekeurige generator', studio: 'Stijlstudio', mobileRandom: 'Willekeurige generator (🎲 Verras me)', mobileStudio: 'Stijlstudio (Unicode en HD-canvas)', menu: 'Menu', language: 'Taal:', languages: 'talen', all: 'Alle', generators: 'NameForge-generatoren', families: { fantasy: 'Fantasie en mythes', business: 'Bedrijven en projecten', creative: 'Creativiteit en media', innovation: 'Innovatie en technologie' } },
+    pl: { catalog: 'Katalog', random: 'Losuj', randomTitle: 'Otwórz losowy generator', studio: 'Studio stylu', mobileRandom: 'Losowy generator (🎲 Zaskocz mnie)', mobileStudio: 'Studio stylu (Unicode i HD Canvas)', menu: 'Menu', language: 'Język:', languages: 'języków', all: 'Wszystkie', generators: 'generatory NameForge', families: { fantasy: 'Fantastyka i mitologia', business: 'Firmy i projekty', creative: 'Kreatywność i media', innovation: 'Innowacje i technologia' } },
+    sv: { catalog: 'Katalog', random: 'Slumpa', randomTitle: 'Öppna en slumpmässig generator', studio: 'Stilstudio', mobileRandom: 'Slumpgenerator (🎲 Överraska mig)', mobileStudio: 'Stilstudio (Unicode och HD Canvas)', menu: 'Meny', language: 'Språk:', languages: 'språk', all: 'Alla', generators: 'NameForge-generatorer', families: { fantasy: 'Fantasy och myter', business: 'Företag och projekt', creative: 'Kreativitet och media', innovation: 'Innovation och teknik' } },
+    da: { catalog: 'Katalog', random: 'Tilfældig', randomTitle: 'Åbn en tilfældig generator', studio: 'Stilstudie', mobileRandom: 'Tilfældig generator (🎲 Overrask mig)', mobileStudio: 'Stilstudie (Unicode og HD Canvas)', menu: 'Menu', language: 'Sprog:', languages: 'sprog', all: 'Alle', generators: 'NameForge-generatorer', families: { fantasy: 'Fantasy og myter', business: 'Virksomheder og projekter', creative: 'Kreativitet og medier', innovation: 'Innovation og teknologi' } },
+    fi: { catalog: 'Luettelo', random: 'Satunnainen', randomTitle: 'Avaa satunnainen generaattori', studio: 'Tyylistudio', mobileRandom: 'Satunnainen generaattori (🎲 Yllätä minut)', mobileStudio: 'Tyylistudio (Unicode ja HD Canvas)', menu: 'Valikko', language: 'Kieli:', languages: 'kieltä', all: 'Kaikki', generators: 'NameForge-generaattorit', families: { fantasy: 'Fantasia ja myytit', business: 'Yritykset ja projektit', creative: 'Luovuus ja media', innovation: 'Innovaatiot ja teknologia' } },
+    uk: { catalog: 'Каталог', random: 'Випадковий', randomTitle: 'Відкрити випадковий генератор', studio: 'Студія стилів', mobileRandom: 'Випадковий генератор (🎲 Здивуй мене)', mobileStudio: 'Студія стилів (Unicode і HD-полотно)', menu: 'Меню', language: 'Мова:', languages: 'мов', all: 'Усі', generators: 'Генератори NameForge', families: { fantasy: 'Фентезі та міфи', business: 'Бізнес і проєкти', creative: 'Творчість і медіа', innovation: 'Інновації та технології' } },
+    bn: { catalog: 'ক্যাটালগ', random: 'এলোমেলো', randomTitle: 'একটি এলোমেলো জেনারেটর খুলুন', studio: 'স্টাইল স্টুডিও', mobileRandom: 'এলোমেলো জেনারেটর (🎲 অবাক করুন)', mobileStudio: 'স্টাইল স্টুডিও (ইউনিকোড ও HD ক্যানভাস)', menu: 'মেনু', language: 'ভাষা:', languages: 'টি ভাষা', all: 'সব', generators: 'NameForge জেনারেটর', families: { fantasy: 'ফ্যান্টাসি ও পুরাণ', business: 'ব্যবসা ও প্রকল্প', creative: 'সৃজনশীলতা ও মিডিয়া', innovation: 'উদ্ভাবন ও প্রযুক্তি' } },
+    nb: { catalog: 'Katalog', random: 'Tilfeldig', randomTitle: 'Åpne en tilfeldig generator', studio: 'Stilstudio', mobileRandom: 'Tilfeldig generator (🎲 Overrask meg)', mobileStudio: 'Stilstudio (Unicode og HD-lerret)', menu: 'Meny', language: 'Språk:', languages: 'språk', all: 'Alle', generators: 'NameForge-generatorer', families: { fantasy: 'Fantasy og myter', business: 'Forretning og prosjekter', creative: 'Kreativt og medier', innovation: 'Innovasjon og teknologi' } },
+    cs: { catalog: 'Katalog', random: 'Náhodný', randomTitle: 'Otevřít náhodný generátor', studio: 'Studio stylu', mobileRandom: 'Náhodný generátor (🎲 Překvap mě)', mobileStudio: 'Studio stylu (Unicode a HD Canvas)', menu: 'Nabídka', language: 'Jazyk:', languages: 'jazyků', all: 'Všechny', generators: 'generátory NameForge', families: { fantasy: 'Fantasy a mýty', business: 'Firmy a projekty', creative: 'Tvorba a média', innovation: 'Inovace a technologie' } },
+    ro: { catalog: 'Catalog', random: 'Aleatoriu', randomTitle: 'Deschide un generator aleatoriu', studio: 'Studio de stil', mobileRandom: 'Generator aleatoriu (🎲 Surprinde-mă)', mobileStudio: 'Studio de stil (Unicode și Canvas HD)', menu: 'Meniu', language: 'Limbă:', languages: 'limbi', all: 'Toate', generators: 'generatoare NameForge', families: { fantasy: 'Fantasy și mituri', business: 'Afaceri și proiecte', creative: 'Creativitate și media', innovation: 'Inovație și tehnologie' } },
+    el: { catalog: 'Κατάλογος', random: 'Τυχαίο', randomTitle: 'Άνοιγμα τυχαίας γεννήτριας', studio: 'Εργαστήριο στυλ', mobileRandom: 'Τυχαία γεννήτρια (🎲 Έκπληξέ με)', mobileStudio: 'Εργαστήριο στυλ (Unicode και HD Canvas)', menu: 'Μενού', language: 'Γλώσσα:', languages: 'γλώσσες', all: 'Όλες', generators: 'γεννήτριες NameForge', families: { fantasy: 'Φαντασία και μύθοι', business: 'Επιχειρήσεις και έργα', creative: 'Δημιουργία και μέσα', innovation: 'Καινοτομία και τεχνολογία' } },
+    ru: { catalog: 'Каталог', random: 'Случайный', randomTitle: 'Открыть случайный генератор', studio: 'Студия стилей', mobileRandom: 'Случайный генератор (🎲 Удиви меня)', mobileStudio: 'Студия стилей (Unicode и HD Canvas)', menu: 'Меню', language: 'Язык:', languages: 'языков', all: 'Все', generators: 'генераторы NameForge', families: { fantasy: 'Фэнтези и мифы', business: 'Бизнес и проекты', creative: 'Творчество и медиа', innovation: 'Инновации и технологии' } },
+    ja: { catalog: 'カタログ', random: 'ランダム', randomTitle: 'ランダムなジェネレーターを開く', studio: 'スタイルスタジオ', mobileRandom: 'ランダム生成器 (🎲 おまかせ)', mobileStudio: 'スタイルスタジオ (Unicode と HD Canvas)', menu: 'メニュー', language: '言語：', languages: '言語', all: 'すべて', generators: 'NameForge ジェネレーター', families: { fantasy: 'ファンタジーと神話', business: 'ビジネスとプロジェクト', creative: '創作とメディア', innovation: 'イノベーションと技術' } },
+    ko: { catalog: '카탈로그', random: '무작위', randomTitle: '무작위 생성기 열기', studio: '스타일 스튜디오', mobileRandom: '무작위 생성기 (🎲 놀라게 해줘)', mobileStudio: '스타일 스튜디오 (Unicode 및 HD Canvas)', menu: '메뉴', language: '언어:', languages: '개 언어', all: '전체', generators: 'NameForge 생성기', families: { fantasy: '판타지와 신화', business: '비즈니스와 프로젝트', creative: '창작과 미디어', innovation: '혁신과 기술' } },
+    zh: { catalog: '目录', random: '随机', randomTitle: '打开随机生成器', studio: '样式工作室', mobileRandom: '随机生成器（🎲 给我惊喜）', mobileStudio: '样式工作室（Unicode 与高清 Canvas）', menu: '菜单', language: '语言：', languages: '种语言', all: '全部', generators: 'NameForge 生成器', families: { fantasy: '奇幻与神话', business: '商业与项目', creative: '创意与媒体', innovation: '创新与科技' } },
+    vi: { catalog: 'Danh mục', random: 'Ngẫu nhiên', randomTitle: 'Mở trình tạo ngẫu nhiên', studio: 'Studio phong cách', mobileRandom: 'Trình tạo ngẫu nhiên (🎲 Làm tôi bất ngờ)', mobileStudio: 'Studio phong cách (Unicode và Canvas HD)', menu: 'Menu', language: 'Ngôn ngữ:', languages: 'ngôn ngữ', all: 'Tất cả', generators: 'trình tạo NameForge', families: { fantasy: 'Giả tưởng và thần thoại', business: 'Doanh nghiệp và dự án', creative: 'Sáng tạo và truyền thông', innovation: 'Đổi mới và công nghệ' } },
+    id: { catalog: 'Katalog', random: 'Acak', randomTitle: 'Buka generator acak', studio: 'Studio Gaya', mobileRandom: 'Generator acak (🎲 Kejutkan saya)', mobileStudio: 'Studio Gaya (Unicode dan Canvas HD)', menu: 'Menu', language: 'Bahasa:', languages: 'bahasa', all: 'Semua', generators: 'generator NameForge', families: { fantasy: 'Fantasi dan mitos', business: 'Bisnis dan proyek', creative: 'Kreativitas dan media', innovation: 'Inovasi dan teknologi' } },
+    th: { catalog: 'แค็ตตาล็อก', random: 'สุ่ม', randomTitle: 'เปิดเครื่องมือสร้างแบบสุ่ม', studio: 'สตูดิโอสไตล์', mobileRandom: 'เครื่องมือสร้างแบบสุ่ม (🎲 เซอร์ไพรส์ฉัน)', mobileStudio: 'สตูดิโอสไตล์ (Unicode และ HD Canvas)', menu: 'เมนู', language: 'ภาษา:', languages: 'ภาษา', all: 'ทั้งหมด', generators: 'เครื่องมือสร้าง NameForge', families: { fantasy: 'แฟนตาซีและตำนาน', business: 'ธุรกิจและโครงการ', creative: 'ความคิดสร้างสรรค์และสื่อ', innovation: 'นวัตกรรมและเทคโนโลยี' } },
+    hi: { catalog: 'कैटलॉग', random: 'यादृच्छिक', randomTitle: 'कोई यादृच्छिक जनरेटर खोलें', studio: 'स्टाइल स्टूडियो', mobileRandom: 'यादृच्छिक जनरेटर (🎲 मुझे चौंकाएँ)', mobileStudio: 'स्टाइल स्टूडियो (Unicode और HD Canvas)', menu: 'मेनू', language: 'भाषा:', languages: 'भाषाएँ', all: 'सभी', generators: 'NameForge जनरेटर', families: { fantasy: 'फैंटेसी और मिथक', business: 'व्यवसाय और परियोजनाएँ', creative: 'रचनात्मकता और मीडिया', innovation: 'नवाचार और तकनीक' } },
+    ar: { catalog: 'الفهرس', random: 'عشوائي', randomTitle: 'افتح مولّدًا عشوائيًا', studio: 'استوديو الأنماط', mobileRandom: 'مولّد عشوائي (🎲 فاجئني)', mobileStudio: 'استوديو الأنماط (Unicode وCanvas عالي الدقة)', menu: 'القائمة', language: 'اللغة:', languages: 'لغات', all: 'الكل', generators: 'مولدات NameForge', families: { fantasy: 'الخيال والأساطير', business: 'الأعمال والمشاريع', creative: 'الإبداع والإعلام', innovation: 'الابتكار والتقنية' } },
+    he: { catalog: 'קטלוג', random: 'אקראי', randomTitle: 'פתיחת מחולל אקראי', studio: 'סטודיו סגנון', mobileRandom: 'מחולל אקראי (🎲 הפתיעו אותי)', mobileStudio: 'סטודיו סגנון (Unicode ו-Canvas HD)', menu: 'תפריט', language: 'שפה:', languages: 'שפות', all: 'הכול', generators: 'מחוללי NameForge', families: { fantasy: 'פנטזיה ומיתוסים', business: 'עסקים ופרויקטים', creative: 'יצירה ומדיה', innovation: 'חדשנות וטכנולוגיה' } },
+    tr: { catalog: 'Katalog', random: 'Rastgele', randomTitle: 'Rastgele oluşturucu aç', studio: 'Stil Stüdyosu', mobileRandom: 'Rastgele oluşturucu (🎲 Şaşırt beni)', mobileStudio: 'Stil Stüdyosu (Unicode ve HD Canvas)', menu: 'Menü', language: 'Dil:', languages: 'dil', all: 'Tümü', generators: 'NameForge oluşturucuları', families: { fantasy: 'Fantastik ve mitler', business: 'İşletmeler ve projeler', creative: 'Yaratıcılık ve medya', innovation: 'Yenilik ve teknoloji' } },
+  };
+  const navText = navCopy[settings.language] || navCopy.en;
+
+  const updateCount = () => {
+    const list = getSavedNames();
+    setSavedCount(list.length);
+  };
+
+  useEffect(() => {
+    updateCount();
+    const unsubStorage = subscribeToStorage(updateCount);
+    const unsubSettings = subscribeToSettings((s) => setSettings(s));
+    return () => {
+      unsubStorage();
+      unsubSettings();
+    };
+  }, []);
+
+  // Close transient navigation panels after route changes and support keyboard dismissal.
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setGeneratorsDropdownOpen(false);
+  }, [currentView]);
+
+  useEffect(() => {
+    const handleNavigationKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMobileMenuOpen(false);
+        setGeneratorsDropdownOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleNavigationKey);
+    return () => window.removeEventListener('keydown', handleNavigationKey);
+  }, []);
+
+  const currentLangMeta = SUPPORTED_LANGUAGES.find((l) => l.code === settings.language) || SUPPORTED_LANGUAGES[0];
+
+  return (
+    <>
+      {showSettingsModal && (
+        <SettingsModal
+          onClose={() => setShowSettingsModal(false)}
+          onSettingsChanged={(s) => setSettings(s)}
+        />
+      )}
+
+      <LanguageSelectorModal
+        isOpen={showLangModal}
+        onClose={() => setShowLangModal(false)}
+        onLanguageSelected={(code) => {
+          setSettings(getAppSettings());
+        }}
+      />
+
+      <header
+        lang={settings.language}
+        dir={currentLangMeta.dir}
+        className="nf-site-header nf-navigation-shell sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800/80 bg-white/95 dark:bg-[#070b14]/92 backdrop-blur-md transition-colors"
+      >
+        <div className="nf-container min-h-[4.5rem] flex items-center justify-between gap-2 sm:gap-4">
+          {/* Brand Logo */}
+          <button
+            onClick={() => {
+              onNavigate('home');
+              setMobileMenuOpen(false);
+            }}
+            className="cursor-pointer text-start focus:outline-none py-1 min-w-0 shrink"
+            aria-label={`NameForge ${t.home}`}
+          >
+            <Logo size="lg" />
+          </button>
+
+          {/* Desktop Primary Nav */}
+          <nav aria-label={getShellLabels(settings.language).mainNavigation} className="nf-desktop-navigation hidden xl:flex items-center gap-5">
+            <button
+              onClick={() => onNavigate('home')}
+              aria-current={currentView === 'home' ? 'page' : undefined}
+              className={`nf-nav-link text-sm font-semibold transition cursor-pointer ${
+                currentView === 'home'
+                  ? 'text-slate-950 dark:text-white border-b-2 border-blue-600 dark:border-violet-400'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
+              }`}
+            >
+              {t.home}
+            </button>
+
+            {/* Generators Dropdown with all 4 families */}
+            <div className="relative">
+              <button
+                onClick={() => setGeneratorsDropdownOpen(!generatorsDropdownOpen)}
+                aria-expanded={generatorsDropdownOpen}
+                aria-controls="nameforge-generators-menu"
+                aria-current={currentView === 'generators' || currentView === 'generator-detail' ? 'page' : undefined}
+                aria-haspopup="true"
+                className={`nf-nav-link text-sm font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                  currentView === 'generators' || currentView === 'generator-detail'
+                    ? 'text-slate-950 dark:text-white border-b-2 border-blue-600 dark:border-violet-400'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
+                }`}
+              >
+                <span>{t.generators} ({ALL_GENERATORS_LIST.length})</span>
+                <ChevronDown className="w-3.5 h-3.5 opacity-75" />
+              </button>
+
+              {generatorsDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={() => setGeneratorsDropdownOpen(false)}
+                  />
+                  <div
+                    id="nameforge-generators-menu"
+                    className="nf-generators-dropdown absolute start-0 mt-2 w-[520px] rounded-2xl bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-slate-700/80 shadow-2xl p-4 z-30 animate-fade-in max-h-[80vh] overflow-y-auto"
+                  >
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-200 dark:border-slate-800">
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                        {navText.all} {ALL_GENERATORS_LIST.length} {navText.generators}
+                      </span>
+                      <button
+                        onClick={() => {
+                          onNavigate('generators');
+                          setGeneratorsDropdownOpen(false);
+                        }}
+                        className="text-xs text-blue-700 dark:text-violet-300 hover:underline font-semibold cursor-pointer"
+                      >
+                        {t.allGenerators.replace(/\b134\b/g, String(ALL_GENERATORS_LIST.length))} →
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      {GENERATOR_FAMILIES_CONFIG.filter((f) => f.id !== 'all').map((fam) => {
+                        const items = ALL_GENERATORS_LIST.filter((g) => g.category === fam.id);
+                        return (
+                          <div key={fam.id} className="space-y-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onNavigate('generators', fam.id);
+                                setGeneratorsDropdownOpen(false);
+                              }}
+                              className="text-[11px] font-bold text-blue-700 dark:text-violet-300 uppercase tracking-wider flex items-center gap-1.5 hover:underline cursor-pointer"
+                            >
+                              <span>{fam.icon}</span>
+                              <span>{navText.families[fam.id] || fam.label} ({items.length})</span>
+                            </button>
+                            <div className="space-y-0.5">
+                              {items.slice(0, 5).map((gen) => (
+                                <button
+                                  key={gen.id}
+                                  onClick={() => {
+                                    onNavigate('generator-detail', gen.id);
+                                    setGeneratorsDropdownOpen(false);
+                                  }}
+                                  className="w-full text-start px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/80 transition flex items-center gap-2 cursor-pointer"
+                                >
+                                  <span>{gen.icon}</span>
+                                  <span className="truncate">{getLocalizedGeneratorShortTitle(gen.id, settings.language, gen.shortTitle)}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Unified Creative Studio */}
+            <button
+              onClick={() => onNavigate('creative-studio')}
+              aria-current={currentView === 'creative-studio' ? 'page' : undefined}
+              className={`nf-nav-link text-sm font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                currentView === 'creative-studio'
+                  ? 'text-slate-950 dark:text-white border-b-2 border-blue-600 dark:border-violet-400'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white'
+              }`}
+            >
+              <Wand2 className="w-3.5 h-3.5 text-blue-600 dark:text-violet-400" />
+              <span>{navText.studio}</span>
+            </button>
+
+            {/* My Names with Live Counter */}
+            <button
+              onClick={() => onNavigate('my-names')}
+              aria-current={currentView === 'my-names' ? 'page' : undefined}
+              className={`nf-nav-link text-sm font-semibold flex items-center gap-2 transition cursor-pointer ${
+                currentView === 'my-names'
+                  ? 'text-rose-700 dark:text-rose-300 border-b-2 border-rose-600 dark:border-rose-400'
+                  : 'text-rose-700 dark:text-rose-300 hover:text-rose-800 dark:hover:text-rose-200'
+              }`}
+            >
+              <Bookmark className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+              <span>{t.myNames}</span>
+              {savedCount > 0 && (
+                <span className="px-2 py-0.5 text-xs font-bold bg-rose-600 text-white rounded-full tabular-nums">
+                  {savedCount}
+                </span>
+              )}
+            </button>
+          </nav>
+
+          {/* Right Header Tools (Random, Language, Settings) */}
+          <div className="nf-header-tools hidden xl:flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => {
+                const randomGen = ALL_GENERATORS_LIST[Math.floor(Math.random() * ALL_GENERATORS_LIST.length)];
+                onNavigate('generator-detail', randomGen.id);
+              }}
+              className="h-9 px-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 transition flex items-center gap-1.5 cursor-pointer"
+              title={`${navText.randomTitle} · ${ALL_GENERATORS_LIST.length}`}
+            >
+              <Dices className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>{navText.random}</span>
+            </button>
+
+            <button
+              onClick={() => setShowLangModal(true)}
+              className="h-9 px-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2 transition cursor-pointer"
+              title={getShellLabels(settings.language).changeLanguageTitle.replace('{count}', String(SUPPORTED_LANGUAGES.length))}
+              aria-label={getShellLabels(settings.language).changeLanguage}
+            >
+              <Globe className="w-3.5 h-3.5 text-sky-600 dark:text-cyan-400" />
+              <span className="uppercase text-[11px] font-bold text-slate-600 dark:text-slate-300">{currentLangMeta.code}</span>
+              <span className="hidden 2xl:inline">{currentLangMeta.native}</span>
+            </button>
+
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700/80 border border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 transition cursor-pointer"
+              title={t.settings}
+              aria-label={t.settings}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="nf-navigation-actions flex xl:hidden items-center gap-1.5 sm:gap-2 shrink-0">
+            <button
+              onClick={() => setShowLangModal(true)}
+              className="h-9 px-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer"
+              aria-label={getShellLabels(settings.language).changeLanguage}
+            >
+              <Globe className="w-4 h-4 text-sky-600 dark:text-cyan-400" />
+              <span className="uppercase">{currentLangMeta.code}</span>
+            </button>
+
+            <button
+              onClick={() => setShowSettingsModal(true)}
+              className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-700 dark:text-slate-200 cursor-pointer"
+              aria-label={t.settings}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="nameforge-mobile-menu"
+              className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-800 dark:text-slate-200 cursor-pointer"
+              aria-label={navText.menu}
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Menu Drawer */}
+        {mobileMenuOpen && (
+          <nav
+            id="nameforge-mobile-menu"
+            aria-label={getShellLabels(settings.language).mainNavigation}
+            className="nf-mobile-navigation xl:hidden border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-[#090d1c] px-4 pt-3 pb-6 space-y-2"
+          >
+            <button
+              onClick={() => {
+                onNavigate('home');
+                setMobileMenuOpen(false);
+              }}
+              aria-current={currentView === 'home' ? 'page' : undefined}
+              className={`nf-mobile-nav-link w-full text-start py-2.5 px-3 rounded-xl text-sm font-semibold transition cursor-pointer ${
+                currentView === 'home'
+                  ? 'bg-blue-50 dark:bg-violet-500/15 text-blue-700 dark:text-white border border-blue-200 dark:border-violet-500/40'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              {t.home}
+            </button>
+
+            <button
+              onClick={() => {
+                onNavigate('generators');
+                setMobileMenuOpen(false);
+              }}
+              aria-current={currentView === 'generators' || currentView === 'generator-detail' ? 'page' : undefined}
+              className={`nf-mobile-nav-link w-full text-start py-2.5 px-3 rounded-xl text-sm font-semibold transition flex items-center justify-between cursor-pointer ${
+                currentView === 'generators' || currentView === 'generator-detail'
+                  ? 'bg-blue-50 dark:bg-violet-500/15 text-blue-700 dark:text-white border border-blue-200 dark:border-violet-500/40'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <span>{t.allGenerators.replace(/\b134\b/g, String(ALL_GENERATORS_LIST.length))}</span>
+              <span className="text-xs bg-blue-100 dark:bg-violet-600/30 text-blue-800 dark:text-violet-200 px-2 py-0.5 rounded-full font-bold tabular-nums">
+                {ALL_GENERATORS_LIST.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                onNavigate('creative-studio');
+                setMobileMenuOpen(false);
+              }}
+              aria-current={currentView === 'creative-studio' ? 'page' : undefined}
+              className={`nf-mobile-nav-link w-full text-start py-2.5 px-3 rounded-xl text-sm font-semibold transition flex items-center gap-2 cursor-pointer ${
+                currentView === 'creative-studio'
+                  ? 'bg-blue-50 dark:bg-violet-500/15 text-blue-700 dark:text-white border border-blue-200 dark:border-violet-500/40'
+                  : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              <Wand2 className="w-4 h-4 text-blue-600 dark:text-violet-400" />
+              <span>{navText.studio}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                onNavigate('my-names');
+                setMobileMenuOpen(false);
+              }}
+              aria-current={currentView === 'my-names' ? 'page' : undefined}
+              className={`nf-mobile-nav-link w-full text-start py-2.5 px-3 rounded-xl text-sm font-semibold transition flex items-center justify-between cursor-pointer ${
+                currentView === 'my-names'
+                  ? 'bg-rose-700 text-white border border-rose-700 shadow-sm'
+                  : 'bg-rose-50 dark:bg-rose-950/50 text-rose-800 dark:text-rose-200 border border-rose-200 dark:border-rose-500/40 hover:bg-rose-100 dark:hover:bg-rose-900/60'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Bookmark className="w-4 h-4 shrink-0" />
+                <span>{t.myNames}</span>
+              </span>
+              {savedCount > 0 && (
+                <span className="text-xs bg-rose-600 text-white px-2 py-0.5 rounded-full font-bold tabular-nums">
+                  {savedCount}
+                </span>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                const randomGen = ALL_GENERATORS_LIST[Math.floor(Math.random() * ALL_GENERATORS_LIST.length)];
+                onNavigate('generator-detail', randomGen.id);
+                setMobileMenuOpen(false);
+              }}
+              className="w-full text-start py-2.5 px-3 rounded-xl text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center gap-2 cursor-pointer"
+            >
+              <Dices className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+              <span>{navText.mobileRandom}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                setShowLangModal(true);
+              }}
+              className="w-full text-start py-2.5 px-3 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-between cursor-pointer"
+            >
+              <span className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-sky-600 dark:text-cyan-400" />
+                <span>{navText.language} {currentLangMeta.native}</span>
+              </span>
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                {SUPPORTED_LANGUAGES.length} {navText.languages}
+              </span>
+            </button>
+          </nav>
+        )}
+      </header>
+    </>
+  );
+};
