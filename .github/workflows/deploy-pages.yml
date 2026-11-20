@@ -166,6 +166,7 @@ jobs:
         run: npm run audit:pages
         env:
           PAGES_BASE_URL: https://gllr-spirit.github.io/NameForge/
+          CANONICAL_SITE_URL: https://nameforge-bhk.pages.dev/
       - name: Audit the published GitHub Pages site
         run: npm run audit:lighthouse
         env:
