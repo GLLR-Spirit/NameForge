@@ -399,3 +399,57 @@ Aucune donnée d'auteur, licence, permission, prompt ou source ne doit être inv
 Le propriétaire du projet et, le cas échéant, les contributeurs doivent fournir les éléments de preuve disponibles : fichiers sources datés, exports, historiques de travail, factures/licences, autorisations écrites, URL et versions des corpus, noms/coordonnées des créateurs avec leur accord, et notices des dépendances. Chaque pièce doit être rattachée à un élément précis du registre. Les éléments non justifiables devront rester exclus du runtime/publication ou être remplacés par des créations nouvelles et traçables.
 
 Cette mise à jour est documentaire. Elle ne modifie pas les données applicatives, les images, les licences du projet ni la visibilité du dépôt.
+
+
+## 16. Audit des deux archives Google AI Studio / NameForge — 2026-11-20
+
+### 16.1 Pièces examinées
+
+Deux archives fournies par le propriétaire du projet ont été examinées en lecture seule :
+
+| Archive | Entrées ZIP | Éléments significatifs | SHA-256 |
+|---|---:|---|---|
+| `NameForge.Version.2.zip` | 92 | Snapshot React/TypeScript/Vite; README décrivant 11 générateurs spécialisés et 21 archétypes; aucun dossier `.aistudio/` ni historique Git détecté | `452bc8a52a368979984cd83071c3a1782c6bda50ba2ce77fb55515293a67ba12` |
+| `nfv2.zip` | 266 | Projet plus volumineux; dossier `.aistudio/`; manifeste de transfert; patch; archive de transfert complémentaire; banques de phrases historiques et documentation de corpus | `c10a2d553808e3c573cc1ff6c4dd2795bf148f73638aa016967bbb7b28d6c768` |
+
+L'archive complémentaire incluse dans `nfv2.zip` contient 60 entrées. Le manifeste décrit un transfert de 62 opérations de fichiers (47 modifications, 9 ajouts et 6 suppressions) à partir d'un commit de référence du dépôt historique mentionné dans ce manifeste.
+
+### 16.2 Ce que les archives établissent
+
+- `nfv2.zip` contient des traces matérielles d'un flux de transfert associé à Google AI Studio : répertoire `.aistudio/artifacts/brain/`, manifeste, patch unifié et archive miroir des fichiers.
+- Le manifeste décrit les changements, leur ordre d'application, les contrôles et les fichiers concernés. Il constitue une trace de travail utile, mais ne prouve pas à lui seul l'auteur humain de chaque ligne ni la titularité juridique de tous les contenus.
+- Le projet `nfv2.zip` contient les fichiers historiques `src/data/phraseBanks.ts`, `phraseBanksExpansionA.ts` et `phraseBanksExpansionB.ts`, ainsi que des registres de sources et de corpus. Ces éléments permettent une comparaison de contenu et de structure avec les versions ultérieures.
+- Le manifeste et la documentation de `nfv2.zip` décrivent une version du projet et un dépôt historique distincts de l'état actuel de `GLLR-Spirit/NameForge`. Ils ne doivent pas être assimilés automatiquement à la version actuellement déployée.
+- `NameForge.Version.2.zip` est un snapshot distinct, dont le README décrit 11 générateurs et 21 archétypes. Il ne contient pas le dossier d'artefacts Google AI Studio ni de métadonnées Git. Il ne peut donc pas être daté par son nom de fichier ni déclaré plus récent sur cette seule base.
+
+### 16.3 Limites techniques des archives
+
+- Aucun répertoire `.git/` n'a été trouvé dans les deux archives. Elles ne contiennent donc pas l'historique Git complet, les objets de commit ni les métadonnées d'auteur/committer qui permettraient de reconstruire toutes les contributions.
+- Aucun enregistrement d'adresse e-mail n'a été trouvé dans les fichiers textuels examinés des deux ZIP. Aucune adresse e-mail de compte n'est reproduite dans ce registre.
+- Aucun motif courant de clé API Google AI Studio ou de jeton GitHub n'a été détecté dans les fichiers textuels analysés. Ce contrôle par motifs ne garantit pas l'absence de tout secret encodé ou obfusqué; les clés doivent rester révoquées/privées et ne jamais être ajoutées au dépôt.
+- Les noms de fichiers arbitraires ou oubliés ne constituent pas un obstacle à l'identification : le contenu, les chemins internes, les manifestes, les empreintes et les correspondances de fichiers sont des critères plus fiables.
+
+### 16.4 Déclaration du propriétaire et attribution souhaitée
+
+Le propriétaire déclare que les deux archives et les comptes utilisés dans le cadre de leur création lui appartiennent. Il demande que l'identité publique de contributeur du projet soit `GLLR-Spirit` uniquement et que les adresses e-mail de ses comptes ne soient pas conservées dans les documents de provenance, les rapports ou les fichiers du projet.
+
+Cette déclaration est consignée comme une déclaration du propriétaire; les ZIP seuls ne permettent pas de vérifier l'identité civile ni la propriété des comptes historiques. Les identifiants de comptes historiques ne sont pas recopiés dans ce registre.
+
+### 16.5 Contrôle de l'historique Git actuel
+
+Une lecture de l'API GitHub sur la branche `main` du dépôt actuel a retourné 128 commits au total (100 sur la première page et 28 sur la deuxième). Pour les 128 commits retournés, le compte auteur lié est `GLLR-Spirit`. Les identités de committer automatisées utilisées par GitHub lors des fusions ne sont pas comptées comme des contributeurs humains distincts.
+
+Ce résultat établit que l'historique de commits actuellement accessible sur `main` est attribué au compte auteur `GLLR-Spirit` dans les réponses GitHub consultées. Il ne prouve pas à lui seul l'origine de chaque contenu importé depuis les archives ni l'absence de contributions antérieures dans des dépôts externes.
+
+Aucune réécriture de l'historique, aucun force-push et aucune modification de `main` n'ont été effectués pendant cet audit. Il n'est pas nécessaire de réécrire l'historique actuel pour obtenir une attribution d'auteur unique sur les 128 commits consultés : GitHub les associe déjà tous à `GLLR-Spirit`.
+
+### 16.6 Décisions et suites
+
+1. Conserver les deux ZIP comme pièces d'audit locales, identifiées par leurs empreintes SHA-256 ci-dessus; ne pas les publier dans le dépôt.
+2. Utiliser `GLLR-Spirit` comme seule identité publique de contributeur dans les nouveaux documents du projet.
+3. Ne pas recopier d'adresse e-mail de compte dans `AUTHORS`, `CONTRIBUTORS`, les registres, les prompts, les exports ou les notices.
+4. Comparer les banques historiques, traductions, données de prénoms et images des archives avec l'état actuel du dépôt, sans réactiver automatiquement les fichiers mis en quarantaine.
+5. Traiter les manifestes Google AI Studio comme preuves de flux de travail et de transfert, et non comme preuve automatique de titularité ou de licence.
+6. Ne pas modifier l'historique Git actuel : l'attribution des 128 commits de `main` est déjà unifiée sous `GLLR-Spirit`.
+
+Cette section ne certifie pas juridiquement la propriété de chaque contenu. Elle consigne les éléments techniques observés, la déclaration du propriétaire et les limites de vérification.
