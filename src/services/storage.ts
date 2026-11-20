@@ -1,0 +1,986 @@
+import {
+  ExportBundle,
+  GeneratorId,
+  HistoryEntry,
+  ImportResult,
+  NamedCollection,
+  SavedNameEntry,
+  SavedProject,
+  StorageStats,
+} from '../types';
+import { getAppSettings } from './settings';
+import { buildCsvContent } from '../utils/csv';
+import { getLocalizedStorageError, getStorageCsvLabels, StorageErrorKey } from '../i18n/moduleLabels';
+
+const STORAGE_KEY = 'nameforge_saved_names';
+const COLLECTIONS_KEY = 'nameforge_collections';
+const HISTORY_KEY = 'nameforge_generation_history';
+const PROJECTS_KEY = 'nameforge_saved_projects';
+
+function getStorageError(key: StorageErrorKey): string {
+  return getLocalizedStorageError(key, getAppSettings().language);
+}
+
+function safeTrim(v: unknown): string {
+  if (v === null || typeof v === 'undefined') return '';
+  return String(v).trim();
+}
+
+const UNSAFE_JSON_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+function sanitizeJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeJsonValue(item));
+  }
+  if (value && typeof value === 'object') {
+    const cleanObj: Record<string, unknown> = Object.create(null);
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (UNSAFE_JSON_KEYS.has(k)) continue;
+      cleanObj[k] = sanitizeJsonValue(v);
+    }
+    return cleanObj;
+  }
+  return value;
+}
+
+function sanitizeColor(value: unknown): string {
+  const raw = safeTrim(value);
+  return /^#[0-9a-fA-F]{3,8}$/.test(raw) ? raw : '#8b5cf6';
+}
+
+function generateId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // fallback
+  }
+  return Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9);
+}
+
+function notifyStorageChange() {
+  try {
+    window.dispatchEvent(new CustomEvent('nameforge:storage'));
+  } catch (e) {
+    console.warn('Unable to dispatch storage custom event', e);
+  }
+}
+
+/**
+ * Universal subscription helper that listens to both internal and cross-tab storage events
+ */
+export function subscribeToStorage(callback: () => void): () => void {
+  const handleInternal = () => callback();
+  const handleExternal = (event: StorageEvent) => {
+    if (!event.key || event.key.startsWith('nameforge_')) {
+      callback();
+    }
+  };
+
+  window.addEventListener('nameforge:storage', handleInternal);
+  window.addEventListener('storage', handleExternal);
+
+  return () => {
+    window.removeEventListener('nameforge:storage', handleInternal);
+    window.removeEventListener('storage', handleExternal);
+  };
+}
+
+/* =====================================================================
+   RATING HELPERS
+===================================================================== */
+
+export function normalizeRating(value: unknown): number {
+  const rating = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) return 0;
+  return Math.round(rating);
+}
+
+export function getStoredRating(name: string): number {
+  try {
+    const val = localStorage.getItem('nameforge_rating_' + name);
+    return val === null ? 0 : normalizeRating(val);
+  } catch {
+    return 0;
+  }
+}
+
+export function setStoredRating(name: string, rating: number): void {
+  try {
+    const normalizedRating = normalizeRating(rating);
+    if (normalizedRating === 0) {
+      localStorage.removeItem('nameforge_rating_' + name);
+    } else {
+      localStorage.setItem('nameforge_rating_' + name, String(normalizedRating));
+    }
+    const names = getSavedNames();
+    const entry = names.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    if (entry) {
+      entry.rating = normalizedRating;
+      saveAllNames(names);
+    } else {
+      notifyStorageChange();
+    }
+  } catch (e) {
+    console.error('Error saving rating', e);
+  }
+}
+
+/**
+ * Returns top-rated names based on real user star evaluations, independently filterable by category
+ */
+export function getTopRatedNamesByCategory(generatorId?: string, limit = 10): SavedNameEntry[] {
+  const all = getSavedNames();
+  const rated = all.filter((entry) => {
+    const hasStars = typeof entry.rating === 'number' && entry.rating > 0;
+    if (!hasStars) return false;
+    if (generatorId && generatorId !== 'all') {
+      return entry.generator.toLowerCase() === generatorId.toLowerCase();
+    }
+    return true;
+  });
+  // Sort strictly by star rating descending (5 to 1), then by most recent
+  rated.sort((a, b) => {
+    const diff = (b.rating || 0) - (a.rating || 0);
+    if (diff !== 0) return diff;
+    return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+  });
+  return rated.slice(0, limit);
+}
+
+/* =====================================================================
+   SAVED NAMES CRUD
+===================================================================== */
+
+function normalizeEntry(raw: any): SavedNameEntry | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const name = safeTrim(raw.name);
+  if (!name) return null;
+
+  return {
+    id: safeTrim(raw.id) || generateId(),
+    name,
+    generator: safeTrim(raw.generator) || 'fantasy',
+    style: safeTrim(raw.style) || 'warrior',
+    saved: raw.saved === true,
+    liked: raw.liked === true,
+    note: safeTrim(raw.note),
+    collectionId: safeTrim(raw.collectionId) || undefined,
+    rating: normalizeRating(raw.rating) || getStoredRating(name),
+    createdAt: safeTrim(raw.createdAt) || new Date().toISOString(),
+  };
+}
+
+/** Remap an imported name's collection reference without attaching it to an unrelated local collection. */
+export function remapImportedCollectionId(
+  collectionId: string | undefined,
+  importedCollectionIdMap: Map<string, string>,
+  declaredImportedCollectionIds: Set<string>
+): string | undefined {
+  if (!collectionId || !declaredImportedCollectionIds.has(collectionId)) return collectionId;
+  return importedCollectionIdMap.get(collectionId);
+}
+
+/** Validate imported history records without trusting fields from an external JSON file. */
+export function normalizeHistoryEntry(raw: unknown): HistoryEntry | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const item = raw as Partial<HistoryEntry>;
+  const name = safeTrim(item.name);
+  const generator = safeTrim(item.generator);
+  if (!name || !generator) return null;
+
+  const rawGeneratedAt = safeTrim(item.generatedAt);
+  const parsedGeneratedAt = Date.parse(rawGeneratedAt);
+  const generatedAt = rawGeneratedAt && Number.isFinite(parsedGeneratedAt)
+    ? new Date(parsedGeneratedAt).toISOString()
+    : new Date().toISOString();
+
+  return {
+    id: safeTrim(item.id) || generateId(),
+    name,
+    generator,
+    style: safeTrim(item.style) || 'default',
+    tone: safeTrim(item.tone),
+    description: safeTrim(item.description),
+    bestFor: safeTrim(item.bestFor),
+    generatedAt,
+  };
+}
+
+function isEntryActive(item: SavedNameEntry): boolean {
+  return (
+    item.saved === true ||
+    item.liked === true ||
+    safeTrim(item.note) !== '' ||
+    !!item.collectionId
+  );
+}
+
+export function getSavedNames(): SavedNameEntry[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const list: SavedNameEntry[] = [];
+    const ids = new Set<string>();
+
+    for (const item of parsed) {
+      const entry = normalizeEntry(item);
+      if (entry) {
+        if (ids.has(entry.id)) {
+          entry.id = generateId();
+        }
+        ids.add(entry.id);
+        list.push(entry);
+      }
+    }
+    return list;
+  } catch (e) {
+    console.error('Error loading saved names from localStorage', e);
+    return [];
+  }
+}
+
+function saveAllNames(names: SavedNameEntry[]): boolean {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(names));
+    notifyStorageChange();
+    return true;
+  } catch (e) {
+    console.error('Error saving names to localStorage', e);
+    return false;
+  }
+}
+
+function findInList(list: SavedNameEntry[], name: string, generator?: string): SavedNameEntry | undefined {
+  const target = safeTrim(name).toLowerCase();
+  if (!target) return undefined;
+  if (generator) {
+    const genTarget = safeTrim(generator).toLowerCase();
+    const exact = list.find((x) => x.name.toLowerCase() === target && x.generator.toLowerCase() === genTarget);
+    if (exact) return exact;
+  }
+  return list.find((x) => x.name.toLowerCase() === target);
+}
+
+export function findSavedEntry(name: string, generator?: string): SavedNameEntry | undefined {
+  const names = getSavedNames();
+  return findInList(names, name, generator);
+}
+
+export function toggleSaveName(
+  name: string,
+  generator: GeneratorId | string,
+  style: string,
+  collectionId?: string
+): boolean {
+  const clean = safeTrim(name);
+  if (!clean) return false;
+  const names = getSavedNames();
+  const existing = findInList(names, clean, generator);
+
+  if (existing) {
+    existing.saved = !existing.saved;
+    if (generator) existing.generator = generator;
+    if (style) existing.style = style;
+    if (collectionId !== undefined) existing.collectionId = collectionId;
+
+    if (!isEntryActive(existing)) {
+      const filtered = names.filter((x) => x.id !== existing.id);
+      saveAllNames(filtered);
+      return false;
+    }
+    saveAllNames(names);
+    return existing.saved;
+  } else {
+    const newEntry: SavedNameEntry = {
+      id: generateId(),
+      name: clean,
+      generator,
+      style,
+      saved: true,
+      liked: false,
+      note: '',
+      collectionId,
+      rating: getStoredRating(clean),
+      createdAt: new Date().toISOString(),
+    };
+    names.unshift(newEntry);
+    saveAllNames(names);
+    return true;
+  }
+}
+
+export function toggleLikeName(name: string, generator: GeneratorId | string, style: string): boolean {
+  const clean = safeTrim(name);
+  if (!clean) return false;
+  const names = getSavedNames();
+  const existing = findInList(names, clean, generator);
+
+  if (existing) {
+    existing.liked = !existing.liked;
+    if (generator) existing.generator = generator;
+    if (style) existing.style = style;
+
+    if (!isEntryActive(existing)) {
+      const filtered = names.filter((x) => x.id !== existing.id);
+      saveAllNames(filtered);
+      return false;
+    }
+    saveAllNames(names);
+    return existing.liked;
+  } else {
+    const newEntry: SavedNameEntry = {
+      id: generateId(),
+      name: clean,
+      generator,
+      style,
+      saved: false,
+      liked: true,
+      note: '',
+      rating: getStoredRating(clean),
+      createdAt: new Date().toISOString(),
+    };
+    names.unshift(newEntry);
+    saveAllNames(names);
+    return true;
+  }
+}
+
+export function updateEntryNote(
+  name: string,
+  note: string,
+  generator?: GeneratorId | string,
+  style?: string
+): boolean {
+  const clean = safeTrim(name);
+  if (!clean) return false;
+  const names = getSavedNames();
+  const existing = findInList(names, clean, generator);
+
+  if (existing) {
+    existing.note = safeTrim(note);
+    if (generator) existing.generator = generator;
+    if (style) existing.style = style;
+
+    if (!isEntryActive(existing)) {
+      const filtered = names.filter((x) => x.id !== existing.id);
+      saveAllNames(filtered);
+      return true;
+    }
+    saveAllNames(names);
+    return true;
+  } else {
+    const newEntry: SavedNameEntry = {
+      id: generateId(),
+      name: clean,
+      generator: generator || 'fantasy',
+      style: style || 'warrior',
+      saved: false,
+      liked: false,
+      note: safeTrim(note),
+      rating: getStoredRating(clean),
+      createdAt: new Date().toISOString(),
+    };
+    if (isEntryActive(newEntry)) {
+      names.unshift(newEntry);
+      saveAllNames(names);
+    }
+    return true;
+  }
+}
+
+export function assignNameToCollection(name: string, collectionId?: string): boolean {
+  const clean = safeTrim(name);
+  if (!clean) return false;
+  const names = getSavedNames();
+  const existing = findInList(names, clean);
+  if (!existing) return false;
+
+  existing.collectionId = collectionId ? safeTrim(collectionId) : undefined;
+  saveAllNames(names);
+  return true;
+}
+
+export function deleteSavedName(name: string, generator?: string): boolean {
+  const clean = safeTrim(name);
+  if (!clean) return false;
+  const names = getSavedNames();
+  const target = clean.toLowerCase();
+  const filtered = names.filter((x) => {
+    if (x.name.toLowerCase() !== target) return true;
+    if (generator && x.generator.toLowerCase() !== generator.toLowerCase()) return true;
+    return false;
+  });
+  saveAllNames(filtered);
+  try {
+    localStorage.removeItem('nameforge_rating_' + clean);
+  } catch {}
+  return true;
+}
+
+/* =====================================================================
+   COLLECTIONS CRUD
+===================================================================== */
+
+export function getCollections(): NamedCollection[] {
+  try {
+    const raw = localStorage.getItem(COLLECTIONS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((c) => ({
+      id: safeTrim(c.id) || generateId(),
+      name: safeTrim(c.name) || 'Collection sans nom',
+      description: safeTrim(c.description),
+      color: safeTrim(c.color) || '#8b5cf6',
+      createdAt: safeTrim(c.createdAt) || new Date().toISOString(),
+    }));
+  } catch (e) {
+    console.error('Error reading collections from localStorage', e);
+    return [];
+  }
+}
+
+export function saveCollections(collections: NamedCollection[]): boolean {
+  try {
+    localStorage.setItem(COLLECTIONS_KEY, JSON.stringify(collections));
+    notifyStorageChange();
+    return true;
+  } catch (e) {
+    console.error('Error saving collections', e);
+    return false;
+  }
+}
+
+export function createCollection(name: string, description = '', color = '#8b5cf6'): NamedCollection | null {
+  const clean = safeTrim(name);
+  if (!clean) return null;
+  const list = getCollections();
+  const newCol: NamedCollection = {
+    id: generateId(),
+    name: clean,
+    description: safeTrim(description),
+    color,
+    createdAt: new Date().toISOString(),
+  };
+  list.unshift(newCol);
+  saveCollections(list);
+  return newCol;
+}
+
+export function updateCollection(id: string, name: string, description: string, color?: string): boolean {
+  const list = getCollections();
+  const existing = list.find((c) => c.id === id);
+  if (!existing) return false;
+  existing.name = safeTrim(name) || existing.name;
+  existing.description = safeTrim(description);
+  if (color) existing.color = color;
+  return saveCollections(list);
+}
+
+export function deleteCollection(id: string): boolean {
+  const list = getCollections();
+  const filtered = list.filter((c) => c.id !== id);
+  // Also unassign names belonging to this collection
+  const names = getSavedNames();
+  names.forEach((n) => {
+    if (n.collectionId === id) {
+      n.collectionId = undefined;
+    }
+  });
+  saveAllNames(names);
+  return saveCollections(filtered);
+}
+
+/* =====================================================================
+   GENERATION HISTORY (50 RECENT NAMES)
+===================================================================== */
+
+export function getGenerationHistory(): HistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+export function addGenerationHistory(
+  entries: Array<{
+    name: string;
+    generatorId: GeneratorId | string;
+    style: string;
+    tone: string;
+    description: string;
+    bestFor: string;
+  }>
+): void {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const current = getGenerationHistory();
+    const existingNames = new Set(current.map((x) => x.name.toLowerCase()));
+    const newItems: HistoryEntry[] = [];
+
+    for (const item of entries) {
+      if (!existingNames.has(item.name.toLowerCase())) {
+        existingNames.add(item.name.toLowerCase());
+        newItems.push({
+          id: generateId(),
+          name: item.name,
+          generator: item.generatorId,
+          style: item.style,
+          tone: item.tone,
+          description: item.description,
+          bestFor: item.bestFor,
+          generatedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    const updated = [...newItems, ...current].slice(0, 50);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+    notifyStorageChange();
+  } catch (e) {
+    console.error('Error saving generation history', e);
+  }
+}
+
+export function clearGenerationHistory(): void {
+  try {
+    localStorage.removeItem(HISTORY_KEY);
+    notifyStorageChange();
+  } catch (e) {
+    console.error('Error clearing history', e);
+  }
+}
+
+/* =====================================================================
+   SAVED PROJECT SNAPSHOTS
+===================================================================== */
+
+function normalizeSavedProject(raw: unknown): SavedProject | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const item = raw as Partial<SavedProject>;
+  const name = safeTrim(item.name);
+  if (!name || !Array.isArray(item.names) || !Array.isArray(item.collections) || !Array.isArray(item.history)) return null;
+  const now = new Date().toISOString();
+  const names = item.names.map((entry) => normalizeEntry(entry)).filter((entry): entry is SavedNameEntry => !!entry);
+  const collections = item.collections
+    .filter((collection) => collection && typeof collection === 'object' && !Array.isArray(collection))
+    .map((collection) => ({
+      id: safeTrim(collection.id) || generateId(),
+      name: safeTrim(collection.name),
+      description: safeTrim(collection.description),
+      color: safeTrim(collection.color) || '#8b5cf6',
+      createdAt: safeTrim(collection.createdAt) || now,
+    }))
+    .filter((collection) => collection.name);
+  const history = item.history
+    .map((entry) => normalizeHistoryEntry(entry))
+    .filter((entry): entry is HistoryEntry => !!entry);
+  return {
+    id: safeTrim(item.id) || generateId(),
+    name,
+    description: safeTrim(item.description),
+    createdAt: safeTrim(item.createdAt) || now,
+    updatedAt: safeTrim(item.updatedAt) || now,
+    names,
+    collections,
+    history,
+  };
+}
+
+export function getSavedProjects(): SavedProject[] {
+  try {
+    const raw = localStorage.getItem(PROJECTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeSavedProject).filter((project): project is SavedProject => !!project)
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  } catch {
+    return [];
+  }
+}
+
+function saveSavedProjects(projects: SavedProject[]): boolean {
+  try {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    notifyStorageChange();
+    return true;
+  } catch (error) {
+    console.error('Error saving NameForge projects', error);
+    return false;
+  }
+}
+
+export function createSavedProject(name: string, description = ''): SavedProject | null {
+  const cleanName = safeTrim(name);
+  if (!cleanName) return null;
+  const now = new Date().toISOString();
+  const project: SavedProject = {
+    id: generateId(),
+    name: cleanName,
+    description: safeTrim(description),
+    createdAt: now,
+    updatedAt: now,
+    names: getSavedNames(),
+    collections: getCollections(),
+    history: getGenerationHistory(),
+  };
+  const projects = getSavedProjects();
+  projects.unshift(project);
+  return saveSavedProjects(projects) ? project : null;
+}
+
+export function deleteSavedProject(id: string): boolean {
+  return saveSavedProjects(getSavedProjects().filter((project) => project.id !== id));
+}
+
+/** Restore a snapshot by merging its data into the current workspace; current data is never erased. */
+export function restoreSavedProject(id: string): ImportResult {
+  const project = getSavedProjects().find((item) => item.id === id);
+  if (!project) {
+    return { success: false, added: 0, updated: 0, skipped: 0, errors: [getStorageError('projectNotFound')] };
+  }
+  return importDataJSON(JSON.stringify({
+    version: 2,
+    names: project.names,
+    collections: project.collections,
+    history: project.history,
+  }));
+}
+
+
+/* =====================================================================
+   STATS & CLEAR ALL
+===================================================================== */
+
+export function getNameForgeStats(): StorageStats {
+  const names = getSavedNames();
+  const collections = getCollections();
+  const history = getGenerationHistory();
+  const uniqueGens = new Set(names.map((x) => x.generator).filter(Boolean));
+
+  return {
+    total: names.length,
+    saved: names.filter((x) => x.saved).length,
+    liked: names.filter((x) => x.liked).length,
+    notes: names.filter((x) => safeTrim(x.note) !== '').length,
+    generators: uniqueGens.size,
+    collections: collections.length,
+    history: history.length,
+  };
+}
+
+export function clearAllSavedNames(): boolean {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(COLLECTIONS_KEY);
+    localStorage.removeItem(HISTORY_KEY);
+    notifyStorageChange();
+    return true;
+  } catch (e) {
+    console.error('Error clearing localStorage', e);
+    return false;
+  }
+}
+
+/* =====================================================================
+   IMPORT & EXPORT (JSON & CSV)
+===================================================================== */
+
+export function exportDataJSON(): string {
+  const bundle: ExportBundle = {
+    version: 3,
+    appName: 'NameForge',
+    exportedAt: new Date().toISOString(),
+    names: getSavedNames(),
+    collections: getCollections(),
+    history: getGenerationHistory(),
+    projects: getSavedProjects(),
+  };
+  return JSON.stringify(bundle, null, 2);
+}
+
+export function exportDataCSV(): string {
+  const names = getSavedNames();
+  const collections = getCollections();
+  const colMap = new Map<string, string>();
+  collections.forEach((c) => colMap.set(c.id, c.name));
+  const csvLabels = getStorageCsvLabels(getAppSettings().language);
+
+  const rows = names.map((n) => [
+    n.name,
+    n.generator,
+    n.style,
+    n.saved ? csvLabels.yes : csvLabels.no,
+    n.liked ? csvLabels.yes : csvLabels.no,
+    n.rating || 0,
+    n.collectionId ? colMap.get(n.collectionId) || csvLabels.other : csvLabels.none,
+    n.note || '',
+    n.createdAt,
+  ]);
+
+  return buildCsvContent(csvLabels.headers, rows, { includeBom: true });
+}
+
+export function importDataJSON(jsonStr: string): ImportResult {
+  const result: ImportResult = {
+    success: false,
+    added: 0,
+    updated: 0,
+    skipped: 0,
+    errors: [],
+  };
+
+  try {
+    const rawParsed = JSON.parse(jsonStr);
+    if (!rawParsed || typeof rawParsed !== 'object') {
+      result.errors.push(getStorageError('invalidJsonFormat'));
+      return result;
+    }
+    const parsed = sanitizeJsonValue(rawParsed) as any;
+    if (!Array.isArray(parsed)) {
+      const version = Number(parsed.version ?? 1);
+      if (!Number.isInteger(version) || version < 1 || version > 3) {
+        result.errors.push(getStorageError('unsupportedBackupVersion'));
+        return result;
+      }
+      if (parsed.projects !== undefined && !Array.isArray(parsed.projects)) {
+        result.errors.push(getStorageError('invalidProjectsList'));
+        return result;
+      }
+    }
+
+    // Validate the payload shape before writing anything to localStorage.
+    // Legacy exports containing only an array of names remain supported.
+    if (!Array.isArray(parsed) && !Array.isArray(parsed.names)) {
+      result.errors.push(getStorageError('invalidNamesList'));
+      return result;
+    }
+    if (!Array.isArray(parsed) && parsed.collections !== undefined && !Array.isArray(parsed.collections)) {
+      result.errors.push(getStorageError('invalidCollectionsList'));
+      return result;
+    }
+    if (!Array.isArray(parsed) && parsed.history !== undefined && !Array.isArray(parsed.history)) {
+      result.errors.push(getStorageError('invalidHistoryList'));
+      return result;
+    }
+
+    const rawNames: any[] = Array.isArray(parsed) ? parsed : parsed.names;
+    const rawCollections: any[] = Array.isArray(parsed) ? [] : (parsed.collections || []);
+    const importedHistory: HistoryEntry[] = !Array.isArray(parsed) && Array.isArray(parsed.history)
+      ? parsed.history
+          .map((item: unknown) => normalizeHistoryEntry(item))
+          .filter((item: HistoryEntry | null): item is HistoryEntry => item !== null)
+      : [];
+    const importedProjects: SavedProject[] = !Array.isArray(parsed) && Array.isArray(parsed.projects)
+      ? parsed.projects.map(normalizeSavedProject).filter((project: SavedProject | null): project is SavedProject => !!project)
+      : [];
+
+    // Snapshot the affected keys so a quota/security error cannot leave a half-imported backup.
+    const previousStorage = {
+      names: localStorage.getItem(STORAGE_KEY),
+      collections: localStorage.getItem(COLLECTIONS_KEY),
+      history: localStorage.getItem(HISTORY_KEY),
+      projects: localStorage.getItem(PROJECTS_KEY),
+    };
+    const rollbackImport = () => {
+      const restore = (key: string, value: string | null) => {
+        try {
+          if (value === null) localStorage.removeItem(key);
+          else localStorage.setItem(key, value);
+        } catch {
+          // Best effort: storage may remain unavailable (e.g. quota exceeded).
+        }
+      };
+      restore(STORAGE_KEY, previousStorage.names);
+      restore(COLLECTIONS_KEY, previousStorage.collections);
+      restore(HISTORY_KEY, previousStorage.history);
+      restore(PROJECTS_KEY, previousStorage.projects);
+    };
+    const failImport = (message: string): ImportResult => {
+      rollbackImport();
+      result.success = false;
+      result.errors.push(message);
+      result.added = 0;
+      result.updated = 0;
+      return result;
+    };
+
+    const existingNames = getSavedNames();
+    const existingMap = new Map<string, SavedNameEntry>();
+    existingNames.forEach((item) => {
+      existingMap.set(item.name.toLowerCase() + '_' + item.generator.toLowerCase(), item);
+    });
+
+    // Keep imported collection references attached to the imported collection,
+    // even when its original ID already belongs to a different local collection.
+    const importedCollectionIdMap = new Map<string, string>();
+    const declaredImportedCollectionIds = new Set<string>();
+    for (const rawCollection of rawCollections) {
+      if (rawCollection && typeof rawCollection === 'object' && !Array.isArray(rawCollection)) {
+        const originalId = safeTrim(rawCollection.id);
+        if (originalId) declaredImportedCollectionIds.add(originalId);
+      }
+    }
+
+    // Import collections with stable, unique destination IDs; malformed entries are ignored.
+    if (rawCollections.length > 0) {
+      const currentCols = getCollections();
+      const colIdSet = new Set(currentCols.map((c) => c.id));
+      for (const rawCollection of rawCollections) {
+        if (!rawCollection || typeof rawCollection !== 'object' || Array.isArray(rawCollection)) {
+          result.skipped++;
+          continue;
+        }
+        const colName = safeTrim(rawCollection.name);
+        if (!colName) {
+          result.skipped++;
+          continue;
+        }
+        const originalId = safeTrim(rawCollection.id);
+        let id = originalId || generateId();
+        if (colIdSet.has(id)) {
+          do {
+            id = generateId();
+          } while (colIdSet.has(id));
+        }
+        colIdSet.add(id);
+        if (originalId && !importedCollectionIdMap.has(originalId)) {
+          importedCollectionIdMap.set(originalId, id);
+        }
+        currentCols.push({
+          id,
+          name: colName,
+          description: safeTrim(rawCollection.description),
+          color: sanitizeColor(rawCollection.color),
+          createdAt: safeTrim(rawCollection.createdAt) || new Date().toISOString(),
+        });
+      }
+      if (!saveCollections(currentCols)) {
+        return failImport(getStorageError('saveCollectionsFailed'));
+      }
+    }
+
+    // Import Names with merge. Remap collection IDs to avoid cross-linking a name
+    // to an unrelated local collection that happens to share the same ID.
+    for (const item of rawNames) {
+      const entry = normalizeEntry(item);
+      if (!entry) {
+        result.skipped++;
+        continue;
+      }
+      entry.collectionId = remapImportedCollectionId(
+        entry.collectionId,
+        importedCollectionIdMap,
+        declaredImportedCollectionIds
+      );
+
+      const key = entry.name.toLowerCase() + '_' + entry.generator.toLowerCase();
+      if (existingMap.has(key)) {
+        const current = existingMap.get(key)!;
+        let modified = false;
+        if (entry.saved && !current.saved) {
+          current.saved = true;
+          modified = true;
+        }
+        if (entry.liked && !current.liked) {
+          current.liked = true;
+          modified = true;
+        }
+        if (entry.note && entry.note !== current.note) {
+          if (!current.note) {
+            current.note = entry.note;
+          } else if (!current.note.includes(entry.note)) {
+            current.note = `${current.note} | ${entry.note}`;
+          }
+          modified = true;
+        }
+        if (entry.rating && (!current.rating || entry.rating > current.rating)) {
+          current.rating = entry.rating;
+          modified = true;
+        }
+        if (entry.collectionId && !current.collectionId) {
+          current.collectionId = entry.collectionId;
+          modified = true;
+        }
+        if (modified) {
+          result.updated++;
+        } else {
+          result.skipped++;
+        }
+      } else {
+        existingNames.unshift(entry);
+        existingMap.set(key, entry);
+        result.added++;
+      }
+    }
+
+    if (!saveAllNames(existingNames)) {
+      return failImport(getStorageError('saveNamesFailed'));
+    }
+
+    // Restore history too, merge by name, then retain the 50 most recent entries.
+    if (importedHistory.length > 0) {
+      const currentHistory = getGenerationHistory();
+      const seenHistoryNames = new Set<string>();
+      const mergedHistory: HistoryEntry[] = [];
+      for (const item of [...currentHistory, ...importedHistory]) {
+        // A name can legitimately appear in multiple generators or styles.
+        // Deduplicate only equivalent history entries, not by display name alone.
+        const key = [
+          safeTrim(item.name).toLocaleLowerCase(),
+          safeTrim(item.generator).toLocaleLowerCase(),
+          safeTrim(item.style).toLocaleLowerCase(),
+        ].join('::');
+        if (!safeTrim(item.name) || seenHistoryNames.has(key)) {
+          result.skipped++;
+          continue;
+        }
+        seenHistoryNames.add(key);
+        mergedHistory.push(item);
+      }
+      mergedHistory.sort((a, b) =>
+        new Date(b.generatedAt || 0).getTime() - new Date(a.generatedAt || 0).getTime()
+      );
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(mergedHistory.slice(0, 50)));
+        notifyStorageChange();
+      } catch {
+        return failImport(getStorageError('restoreHistoryFailed'));
+      }
+    }
+
+    if (importedProjects.length > 0) {
+      const currentProjects = getSavedProjects();
+      const knownProjectIds = new Set(currentProjects.map((project) => project.id));
+      const knownProjectNames = new Set(currentProjects.map((project) => project.name.toLocaleLowerCase()));
+      for (const project of importedProjects) {
+        if (knownProjectIds.has(project.id) || knownProjectNames.has(project.name.toLocaleLowerCase())) {
+          result.skipped++;
+          continue;
+        }
+        currentProjects.push(project);
+        knownProjectIds.add(project.id);
+        knownProjectNames.add(project.name.toLocaleLowerCase());
+      }
+      if (!saveSavedProjects(currentProjects)) {
+        return failImport(getStorageError('saveProjectsFailed'));
+      }
+    }
+
+    result.success = true;
+    return result;
+  } catch (e: any) {
+    result.errors.push(e?.message || getStorageError('jsonReadError'));
+    return result;
+  }
+}

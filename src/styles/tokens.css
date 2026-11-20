@@ -1,0 +1,169 @@
+/* NameForge Semantic Design Tokens (Dark & Light Themes)
+   Single source of truth for surface, ink, border, interactive, and status colors. */
+
+:root,
+html.dark {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --nf-page-bg: #070b14;
+  --nf-surface: #0f172a;
+  --nf-surface-raised: #162036;
+  --nf-surface-muted: #0b1120;
+  --nf-surface-glass: rgba(11, 17, 32, 0.88);
+
+  /* Borders */
+  --nf-border: rgba(148, 163, 184, 0.18);
+  --nf-border-strong: rgba(148, 163, 184, 0.34);
+
+  /* Typography */
+  --nf-ink: #f8fafc;
+  --nf-muted: #cbd5e1;
+  --nf-subtle: #94a3b8;
+
+  /* Brand & Interactive */
+  --nf-primary: #6366f1;
+  --nf-primary-hover: #4f46e5;
+  --nf-primary-ink: #ffffff;
+  --nf-primary-soft: rgba(99, 102, 241, 0.18);
+
+  --nf-accent: #8b5cf6;
+  --nf-accent-strong: #7c3aed;
+  --nf-accent-ink: #ddd6fe;
+  --nf-accent-soft: rgba(139, 92, 246, 0.16);
+
+  --nf-secondary: #38bdf8;
+  --nf-secondary-ink: #7dd3fc;
+
+  /* Random / Surprise Action (Warm Golden Amber — WCAG AAA dark ink) */
+  --nf-random-bg: #fbbf24;
+  --nf-random-bg-hover: #f59e0b;
+  --nf-random-bg-active: #d97706;
+  --nf-random-ink: #0f172a;
+  --nf-random-border: #fcd34d;
+  --nf-random-ring: rgba(251, 191, 36, 0.4);
+
+  /* My Collections & Saved Action (Refined Medium Rose/Crimson — WCAG AA+ white ink) */
+  --nf-collections-bg: #be123c;
+  --nf-collections-bg-hover: #e11d48;
+  --nf-collections-bg-active: #9f1239;
+  --nf-collections-ink: #ffffff;
+  --nf-collections-border: #fb7185;
+  --nf-collections-ring: rgba(244, 63, 94, 0.42);
+
+  /* Status */
+  --nf-success: #34d399;
+  --nf-success-bg: rgba(16, 185, 129, 0.14);
+  --nf-success-border: rgba(52, 211, 153, 0.35);
+
+  --nf-warning: #fbbf24;
+  --nf-warning-bg: rgba(245, 158, 11, 0.14);
+  --nf-warning-border: rgba(251, 191, 36, 0.35);
+
+  --nf-danger: #fb7185;
+  --nf-danger-bg: rgba(244, 63, 94, 0.14);
+  --nf-danger-border: rgba(251, 113, 133, 0.35);
+
+  /* Shadows, Layout & Motion */
+  --nf-content-width: 1440px;
+  --nf-reading-width: 960px;
+  --nf-section-gap: clamp(2.75rem, 5.5vw, 5rem);
+  --nf-page-gutter: clamp(1rem, 3vw, 2rem);
+  --nf-card-gap: clamp(0.85rem, 1.6vw, 1.25rem);
+  --nf-control-height: 2.75rem;
+  --nf-heading-display: clamp(2rem, 4vw, 3.5rem);
+  --nf-heading-section: clamp(1.25rem, 2.2vw, 1.75rem);
+  --nf-radius-sm: 0.5rem;
+  --nf-radius-control: 0.75rem;
+  --nf-radius-card: 1rem;
+  --nf-radius-panel: 1.25rem;
+  --nf-shadow: 0 20px 50px rgba(2, 6, 23, 0.45);
+  --nf-shadow-soft: 0 8px 24px rgba(2, 6, 23, 0.28);
+
+  --nf-motion-fast: 140ms;
+  --nf-motion-normal: 200ms;
+  --nf-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html.light {
+  color-scheme: light;
+
+  /* Surfaces */
+  --nf-page-bg: #f8fafc;
+  --nf-surface: #ffffff;
+  --nf-surface-raised: #ffffff;
+  --nf-surface-muted: #f1f5f9;
+  --nf-surface-glass: rgba(255, 255, 255, 0.92);
+
+  /* Borders */
+  --nf-border: #cbd5e1;
+  --nf-border-strong: #94a3b8;
+
+  /* Typography — >= 6.5:1 muted, >= 14:1 primary ink */
+  --nf-ink: #0f172a;
+  --nf-muted: #475569;
+  --nf-subtle: #64748b;
+
+  /* Brand & Interactive — Medium Blue WCAG AA+ Primary CTA (#2563eb + #ffffff = 5.17:1) */
+  --nf-primary: #2563eb;
+  --nf-primary-hover: #1d4ed8;
+  --nf-primary-ink: #ffffff;
+  --nf-primary-soft: rgba(37, 99, 235, 0.1);
+
+  --nf-accent: #2563eb;
+  --nf-accent-strong: #1d4ed8;
+  --nf-accent-ink: #1e40af;
+  --nf-accent-soft: rgba(37, 99, 235, 0.1);
+
+  --nf-secondary: #0284c7;
+  --nf-secondary-ink: #0369a1;
+
+  /* Random / Surprise Action (Warm Golden Amber — WCAG AAA dark ink) */
+  --nf-random-bg: #f59e0b;
+  --nf-random-bg-hover: #d97706;
+  --nf-random-bg-active: #b45309;
+  --nf-random-ink: #0f172a;
+  --nf-random-border: #b45309;
+  --nf-random-ring: rgba(245, 158, 11, 0.35);
+
+  /* My Collections & Saved Action (Refined Medium Rose/Crimson — WCAG AA+ white ink) */
+  --nf-collections-bg: #be123c;
+  --nf-collections-bg-hover: #9f1239;
+  --nf-collections-bg-active: #881337;
+  --nf-collections-ink: #ffffff;
+  --nf-collections-border: #9f1239;
+  --nf-collections-ring: rgba(225, 29, 72, 0.35);
+
+  /* Status */
+  --nf-success: #047857;
+  --nf-success-bg: #ecfdf5;
+  --nf-success-border: #a7f3d0;
+
+  --nf-warning: #b45309;
+  --nf-warning-bg: #fffbeb;
+  --nf-warning-border: #fde68a;
+
+  --nf-danger: #be123c;
+  --nf-danger-bg: #fff1f2;
+  --nf-danger-border: #fecdd3;
+
+  --nf-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+  --nf-shadow-soft: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+html.reduce-motion {
+  --nf-motion-fast: 0.001ms;
+  --nf-motion-normal: 0.001ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --nf-motion-fast: 0.001ms;
+    --nf-motion-normal: 0.001ms;
+  }
+}
