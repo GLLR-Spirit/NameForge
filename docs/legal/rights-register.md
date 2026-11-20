@@ -188,3 +188,28 @@ La piste historique est partiellement établie pour le fichier principal : il ex
 - Documents de travail ou fichiers locaux antérieurs à l'ajout des phrases.
 - Identification des personnes ayant rédigé ou fourni les banques.
 - Toute source externe utilisée comme inspiration, référence ou matière première.
+
+
+## 12. Traçage de l'import dans le dépôt actuel
+
+Le commit de migration du dépôt actuel `5272543c19b6986db3675657a077b8a5d0abccef` (« Replace legacy NameForge app with React Vite platform ») a introduit **255 fichiers** dans le dépôt actuel. Parmi les fichiers présents dans ce commit figurent :
+- les trois banques `phraseBanks.ts`, `phraseBanksExpansionA.ts`, `phraseBanksExpansionB.ts` ;
+- les fichiers de prénoms et le manifeste de datasets ;
+- les images `public/images/*` et `src/assets/images/nameforge-logo-128.png` ;
+- de nombreux modules de traduction `src/i18n/*`.
+
+GitHub associe ce commit au compte `GLLR-Spirit` comme auteur et committer. Les métadonnées visibles ne donnent pas de nom ni d'adresse email publics et ne prouvent pas qui a créé chaque fichier avant la migration. Le commit de migration établit donc la date d'import dans le dépôt actuel, pas la création originale ni la titularité des droits.
+
+Conséquence : pour les fichiers binaires et modules dont l'historique antérieur n'est pas présent dans le dépôt actuel, il faut retrouver les copies de travail, archives, commits d'autres dépôts, exports et preuves de création antérieurs. La migration ne doit pas être utilisée comme preuve unique de propriété.
+
+### État de traçabilité après cette vérification
+
+| Élément | Trace d'import actuelle | Trace antérieure retrouvée | Conclusion |
+|---|---|---|---|
+| `phraseBanks.ts` | Importé par le commit de migration | Fichier apparenté trouvé dans NFV2 avec plusieurs commits d'évolution | Historique partiel; droits des formulations non établis |
+| `phraseBanksExpansionA.ts` | Importé par le commit de migration | Pas retrouvé dans NFV2 au même chemin | Provenance antérieure inconnue |
+| `phraseBanksExpansionB.ts` | Importé par le commit de migration | Pas retrouvé dans NFV2 au même chemin | Provenance antérieure inconnue |
+| Images/logo | Importés par le commit de migration | Pas d'historique de création/source vérifié dans cette passe | Origine et droits à prouver |
+| Traductions | Importées par le commit de migration | Historique de traduction et auteurs non établis dans cette passe | Origine et droits à documenter |
+| Prénoms/données | Importés par le commit de migration | Références par entrée non établies dans cette passe | Sources et exactitude à documenter |
+
