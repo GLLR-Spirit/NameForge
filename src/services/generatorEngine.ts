@@ -1,0 +1,1762 @@
+import {
+  FormatOption,
+  GenderOption,
+  GeneratedName,
+  GeneratorId,
+  GenLanguageCode,
+  LengthOption,
+  SubcategoryData,
+} from '../types';
+import { SUBCATEGORIES_DATA } from '../data/subcategories';
+import { resolveStyleData } from '../data/styles';
+import { addGenerationHistory } from './storage';
+import { GENERATORS_METADATA } from '../data/generators';
+import { ATTESTED_BABY_NAMES, LOCALIZED_BABY_NAMES } from '../data/attestedBabyNames';
+import { getPhraseBank } from '../data/phraseBanks';
+import { getFamilyLinguisticPolicy, getLanguageScriptProfile, getScriptsInText, isKeywordCompatibleWithLanguage } from './linguisticRules';
+import { getCategoryLanguageCompatibility, JAPANESE_ANIME_GENERATORS } from './languageCompatibility';
+import { selectDiverseCandidates } from './diversity';
+import { countOrthographicUnits, requiresWholeTokenGeneration } from './orthographicUnits';
+import { resolveEnglishDomainPool } from '../data/englishDomainPools';
+import { screenTrademarkSimilarity } from './trademarkSafeguard';
+
+const RECENT_NAMES_KEY = 'nameforge_recent_names';
+const RECENT_LIMIT = 120;
+
+function randomItem<T>(arr?: T[]): T | '' {
+  if (!arr || !arr.length) return '';
+  return arr[Math.floor(activeRandom() * arr.length)];
+}
+
+function cap(v: string): string {
+  const str = String(v || '').trim();
+  return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
+}
+
+function normalize(s: string): string {
+  return cap(
+    String(s || '')
+      .replace(/[^\p{L}\p{M}\p{N}'’& -]/gu, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  );
+}
+
+
+/**
+ * Phonetic transliteration preserves category-specific roots. It is not a
+ * semantic translation and deliberately avoids generic personal-name suffixes.
+ */
+function foldAccentedLatinForArabic(part: string): string {
+  return part
+    .normalize('NFC')
+    .toLocaleLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/œ/g, 'e')
+    .replace(/æ/g, 'ae')
+    .replace(/[àâäáãå]/g, 'a')
+    .replace(/[éèêë]/g, 'i')
+    .replace(/[îïíì]/g, 'i')
+    .replace(/[ôöóòõø]/g, 'o')
+    .replace(/[ûüùú]/g, 'u')
+    .replace(/[ÿý]/g, 'y')
+    .replace(/ç/g, 's')
+    .replace(/ñ/g, 'ny')
+    .normalize('NFKD')
+    .replace(/\p{M}/gu, '');
+}
+
+function transliterateLatinToArabic(value: string): string {
+  const digraphs: Array<[string, string]> = [
+    ['sch', 'ش'], ['tch', 'تش'], ['tion', 'سيون'], ['sh', 'ش'], ['ch', 'تش'], ['kh', 'خ'],
+    ['gh', 'غ'], ['th', 'ث'], ['dh', 'ذ'], ['ph', 'ف'], ['zh', 'ژ'], ['gn', 'ني'],
+    ['eau', 'و'], ['au', 'و'], ['oi', 'وا'], ['ck', 'ك'], ['qu', 'ك'], ['ou', 'و'], ['oo', 'و'], ['ee', 'ي'],
+    ['ea', 'ي'], ['ai', 'اي'], ['ay', 'اي'], ['ie', 'ي'],
+  ];
+  const letters: Record<string, string> = {
+    a: 'ا', b: 'ب', c: 'ك', d: 'د', e: 'ي', f: 'ف', g: 'غ', h: 'ه',
+    i: 'ي', j: 'ج', k: 'ك', l: 'ل', m: 'م', n: 'ن', o: 'و', p: 'ب',
+    q: 'ك', r: 'ر', s: 'س', t: 'ت', u: 'و', v: 'ف', w: 'و', x: 'كس', y: 'ي', z: 'ز',
+  };
+  return String(value ?? '').split(/(\s+)/u).map((part) => {
+    if (!/\p{Script=Latin}/u.test(part)) return part;
+    let remaining = foldAccentedLatinForArabic(part);
+    let output = '';
+    while (remaining.length) {
+      const match = digraphs.find(([latin]) => remaining.startsWith(latin));
+      if (match) {
+        output += match[1];
+        remaining = remaining.slice(match[0].length);
+        continue;
+      }
+      const char = Array.from(remaining)[0];
+      if (letters[char]) {
+        output += letters[char];
+      } else if (!/[a-z]/i.test(char)) {
+        output += char;
+      }
+      remaining = remaining.slice(char.length);
+    }
+    return output;
+  }).join('').normalize('NFC');
+}
+
+/**
+ * Strict Hepburn-style romaji to katakana conversion for the Anime vocabulary.
+ * Unknown sequences fail closed: silently dropping a consonant would falsify
+ * the source pronunciation and create misleading Japanese-looking output.
+ */
+export function transliterateAnimeToKatakana(value: string): string {
+  const syllables: Record<string, string> = {
+    kya: 'キャ', kyu: 'キュ', kyo: 'キョ', sha: 'シャ', shu: 'シュ', sho: 'ショ',
+    cha: 'チャ', chu: 'チュ', cho: 'チョ', nya: 'ニャ', nyu: 'ニュ', nyo: 'ニョ',
+    hya: 'ヒャ', hyu: 'ヒュ', hyo: 'ヒョ', mya: 'ミャ', myu: 'ミュ', myo: 'ミョ',
+    rya: 'リャ', ryu: 'リュ', ryo: 'リョ', gya: 'ギャ', gyu: 'ギュ', gyo: 'ギョ',
+    ja: 'ジャ', ju: 'ジュ', jo: 'ジョ',
+    shi: 'シ', chi: 'チ', tsu: 'ツ', fu: 'フ', ji: 'ジ',
+    ka: 'カ', ki: 'キ', ku: 'ク', ke: 'ケ', ko: 'コ', sa: 'サ', su: 'ス', se: 'セ', so: 'ソ',
+    ta: 'タ', te: 'テ', to: 'ト', na: 'ナ', ni: 'ニ', nu: 'ヌ', ne: 'ネ', no: 'ノ',
+    ha: 'ハ', hi: 'ヒ', he: 'ヘ', ho: 'ホ', ma: 'マ', mi: 'ミ', mu: 'ム', me: 'メ', mo: 'モ',
+    ya: 'ヤ', yu: 'ユ', yo: 'ヨ', ra: 'ラ', ri: 'リ', ru: 'ル', re: 'レ', ro: 'ロ',
+    wa: 'ワ', wo: 'ヲ', ga: 'ガ', gi: 'ギ', gu: 'グ', ge: 'ゲ', go: 'ゴ',
+    za: 'ザ', zu: 'ズ', ze: 'ゼ', zo: 'ゾ', da: 'ダ', de: 'デ', do: 'ド',
+    ba: 'バ', bi: 'ビ', bu: 'ブ', be: 'ベ', bo: 'ボ', pa: 'パ', pi: 'ピ', pu: 'プ', pe: 'ペ', po: 'ポ',
+    a: 'ア', i: 'イ', u: 'ウ', e: 'エ', o: 'オ',
+  };
+  const input = String(value ?? '').normalize('NFC').trim().toLowerCase();
+  if (!input || !/^(?:[a-z]|n')+(?:\s+(?:[a-z]|n')+)*$/u.test(input)) return '';
+
+  return input.split(/\s+/u).map((part) => {
+    let remaining = part;
+    let output = '';
+    while (remaining.length) {
+      if (remaining.startsWith("n'")) {
+        output += 'ン';
+        remaining = remaining.slice(2);
+        continue;
+      }
+      if (remaining.length > 1 && remaining[0] === remaining[1] &&
+          !'aeioun'.includes(remaining[0])) {
+        output += 'ッ';
+        remaining = remaining.slice(1);
+        continue;
+      }
+      const key = [remaining.slice(0, 3), remaining.slice(0, 2), remaining.slice(0, 1)]
+        .find((candidate) => syllables[candidate]);
+      if (key) {
+        output += syllables[key];
+        remaining = remaining.slice(key.length);
+        continue;
+      }
+      if (remaining[0] === 'n' &&
+          (remaining.length === 1 || !'aiueoy'.includes(remaining[1]))) {
+        output += 'ン';
+        remaining = remaining.slice(1);
+        continue;
+      }
+      // Never discard an unsupported letter or invent a partial transliteration.
+      return '';
+    }
+    return output;
+  }).join(' ');
+}
+
+/* =====================================================================
+   1. SIMILARITY & LEVENSHTEIN DISTANCE FILTER
+===================================================================== */
+
+function comparisonKey(value: string): string {
+  // NFC makes canonically equivalent spellings compare equally (e.g. é and e + ◌́).
+  // Normalize punctuation and whitespace without deleting word boundaries.
+  return String(value ?? '')
+    .normalize('NFC')
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{M}\p{N}\p{S}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function codePointsLevenshtein(left: string[], right: string[]): number {
+  const al = left.length;
+  const bl = right.length;
+  if (al === 0) return bl;
+  if (bl === 0) return al;
+
+  const row = Array.from({ length: bl + 1 }, (_, index) => index);
+  for (let i = 1; i <= al; i++) {
+    let diagonal = row[0];
+    row[0] = i;
+    for (let j = 1; j <= bl; j++) {
+      const above = row[j];
+      const cost = left[i - 1] === right[j - 1] ? 0 : 1;
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, diagonal + cost);
+      diagonal = above;
+    }
+  }
+  return row[bl];
+}
+
+export function calculateLevenshteinDistance(a: string, b: string): number {
+  // Compare normalized Unicode code points, not UTF-16 code units.
+  return codePointsLevenshtein(
+    Array.from(comparisonKey(a)),
+    Array.from(comparisonKey(b))
+  );
+}
+
+export function isTooSimilar(candidate: string, existingList: string[], keyword?: string): boolean {
+  const candLower = comparisonKey(candidate);
+  const kwLower = keyword ? comparisonKey(keyword) : '';
+  const hasKw = Boolean(kwLower && Array.from(kwLower).length >= 2);
+  let cachedCCompPoints: string[] | null = null;
+
+  for (const existing of existingList) {
+    const exLower = comparisonKey(existing);
+    if (candLower === exLower) return true;
+
+    // Remove the requested keyword from both candidates before comparing their distinct parts.
+    let cComp = candLower;
+    let eComp = exLower;
+    let usedStripped = false;
+    if (hasKw && cComp.includes(kwLower) && eComp.includes(kwLower)) {
+      cComp = cComp.replace(kwLower, '').trim();
+      eComp = eComp.replace(kwLower, '').trim();
+      if (!cComp || !eComp) return true;
+      if (cComp === eComp) return true;
+      usedStripped = true;
+    }
+
+    const cPoints = usedStripped ? Array.from(cComp) : (cachedCCompPoints ??= Array.from(candLower));
+    const ePoints = Array.from(eComp);
+    const cLength = cPoints.length;
+    const eLength = ePoints.length;
+    if (cLength >= 4 && eLength >= 4 && (cComp.includes(eComp) || eComp.includes(cComp))) {
+      return true;
+    }
+
+    // Short names (especially CJK names) have little room for safe fuzzy matching.
+    // Keep exact matching for 1–2 character candidates; don't discard valid alternatives.
+    if (Math.min(cLength, eLength) <= 2) continue;
+
+    const maxAllowed = Math.max(cLength, eLength) <= 5 ? 1 : 2;
+    if (Math.abs(cLength - eLength) > maxAllowed) continue;
+
+    const dist = codePointsLevenshtein(cPoints, ePoints);
+    if (dist <= maxAllowed) return true;
+  }
+  return false;
+}
+
+/* =====================================================================
+   2. LINGUISTIC PHONETICS & ROOTS
+===================================================================== */
+
+const LANGUAGE_PHONETICS: Record<
+  GenLanguageCode,
+  { prefixes: string[]; suffixes: string[]; titleWords: string[]; vowels: string[]; consonants: string[] }
+> = {
+  auto: {
+    prefixes: [],
+    suffixes: [],
+    titleWords: [],
+    vowels: ['a', 'e', 'i', 'o', 'u', 'y'],
+    consonants: ['b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'z'],
+  },
+  fr: {
+    prefixes: ['Val', 'Mont', 'Clair', 'Beau', 'Soleil', 'Aurore', 'Bel', 'Chant', 'Font', 'Roc', 'Mir', 'Lys', 'Doux'],
+    suffixes: ['val', 'mont', 'elle', 'eur', 'ance', 'ier', 'on', 'ard', 'ière', 'ac', 'ain', 'euil', 'or'],
+    titleWords: ['le Brave', 'l’Audacieux', 'le Grand', 'le Sage', 'le Vaillant', 'le Juste'],
+    vowels: ['a', 'e', 'i', 'o', 'u', 'é', 'è', 'eau'],
+    consonants: ['v', 'l', 'm', 'r', 's', 'c', 'b', 'f', 't', 'p', 'd'],
+  },
+  en: {
+    prefixes: ['Star', 'Swift', 'Bright', 'Iron', 'Stone', 'Oak', 'Gold', 'Silver', 'Storm', 'Shadow', 'Frost', 'Hawk'],
+    suffixes: ['ford', 'wood', 'field', 'craft', 'well', 'ton', 'dale', 'stone', 'worth', 'brook', 'gate', 'crest'],
+    titleWords: ['the Bold', 'the Swift', 'the Valiant', 'the Fearless', 'the Keeper', 'the Vanguard'],
+    vowels: ['a', 'e', 'i', 'o', 'u', 'ea', 'ee', 'ai'],
+    consonants: ['b', 'c', 'd', 'f', 'g', 'h', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'w'],
+  },
+  ja: {
+    prefixes: ['カイ', 'シン', 'リュウ', 'ソラ', 'レン', 'ハル', 'アキ', 'タカ', 'ユキ', 'カゼ', 'キラ', 'ハナ', 'ミオ'],
+    suffixes: ['マル', 'ト', 'ヤ', 'シ', 'ゼン', 'ジン', 'ナリ', 'ロ', 'ソラ', 'カ', 'キ', 'コ', 'スケ'],
+    titleWords: ['勇者', '守護者', '影の剣士', '月の騎士', '星の旅人'],
+    vowels: [],
+    consonants: [],
+  },
+  ar: {
+    prefixes: ['نور', 'طارق', 'زيد', 'مالك', 'ريان', 'قمر', 'بدر', 'فريد', 'كريم', 'سامي', 'أمير', 'ليث'],
+    suffixes: ['ان', 'ير', 'يم', 'ون', 'اد', 'ين', 'ار', 'يا', 'ور', 'ال', 'وس', 'ام'],
+    titleWords: ['النبيل', 'الفارس', 'حارس الضياء', 'سيف الظل', 'المسافر'],
+    vowels: ['a', 'i', 'u', 'ou', 'ai'],
+    consonants: ['b', 't', 'j', 'd', 'r', 'z', 's', 'q', 'k', 'l', 'm', 'n', 'h'],
+  },
+  latin: {
+    prefixes: ['Aurel', 'Cael', 'Sylv', 'Maxi', 'Valer', 'Cass', 'Luc', 'Mar', 'Sever', 'Jul', 'Titus', 'Octav'],
+    suffixes: ['ius', 'or', 'is', 'aris', 'ia', 'on', 'ora', 'us', 'ian', 'um', 'ix', 'ex'],
+    titleWords: ['Magnus', 'Victor', 'Invictus', 'Augustus', 'Felix', 'Priscus'],
+    vowels: ['a', 'e', 'i', 'o', 'u', 'ae'],
+    consonants: ['c', 'd', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'x'],
+  },
+  nordic: {
+    prefixes: ['Thor', 'Ragnar', 'Bjorn', 'Sig', 'Erik', 'Gunn', 'Sven', 'Olaf', 'Ivar', 'Val', 'Har', 'As'],
+    suffixes: ['gard', 'stein', 'son', 'grim', 'heim', 'vald', 'rik', 'ulf', 'mund', 'var', 'karl', 'brand'],
+    titleWords: ['Briseciel', 'au Cœur de Pierre', 'le Grand Viking', 'Hache-Rouge', 'l’Invaincu'],
+    vowels: ['a', 'e', 'i', 'o', 'u', 'y'],
+    consonants: ['b', 'd', 'g', 'k', 'l', 'm', 'n', 'r', 's', 't', 'v'],
+  },
+  tech: {
+    prefixes: ['Neo', 'Syn', 'Omni', 'Velo', 'Kinet', 'Hyper', 'Nex', 'Zeta', 'Volt', 'Aero', 'Quantum', 'Pulse', 'Cyber'],
+    suffixes: ['ix', 'ex', 'iq', 'os', 'ify', 'ly', 'io', 'on', 'um', 'ora', 'core', 'net', 'flow'],
+    titleWords: ['Core', 'Prime', 'Ultra', 'Next', 'System', 'Engine', 'Stack'],
+    vowels: ['a', 'e', 'i', 'o', 'u', 'y'],
+    consonants: ['b', 'c', 'd', 'f', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'x', 'z'],
+  },
+  es: { prefixes: ['Sol', 'Luz', 'Monte', 'Bella', 'Cielo', 'Brisa', 'Fuego', 'Luna', 'Val', 'Flor'], suffixes: ['ero', 'era', 'ado', 'ada', 'illa', 'oso', 'osa', 'ez', 'iel', 'ano'], titleWords: ['el Valiente', 'la Estrella', 'el Guardián', 'la Sombra'], vowels: ['a','e','i','o','u'], consonants: ['b','c','d','f','g','j','l','m','n','ñ','p','r','s','t','v','z'] },
+  de: { prefixes: ['Stern', 'Wald', 'Eisen', 'Gold', 'Nebel', 'Dunkel', 'Falk', 'Mond', 'Stein', 'Winter'], suffixes: ['berg', 'wald', 'stein', 'heim', 'mann', 'hardt', 'fried', 'burg', 'tal', 'reich'], titleWords: ['der Kühne', 'der Wächter', 'die Schattenklinge', 'der Wanderer'], vowels: ['a','e','i','o','u','ä','ö','ü'], consonants: ['b','d','f','g','h','k','l','m','n','r','s','t','w','z'] },
+  it: { prefixes: ['Luna', 'Bella', 'Monte', 'Sole', 'Fiore', 'Stella', 'Oro', 'Vento', 'Rosa', 'Alba'], suffixes: ['ello', 'ella', 'ini', 'ino', 'etto', 'etta', 'aro', 'ora', 'ano', 'ina'], titleWords: ['il Coraggioso', 'la Stella', 'il Custode', 'l’Ombra'], vowels: ['a','e','i','o','u'], consonants: ['b','c','d','f','g','l','m','n','p','r','s','t','v','z'] },
+  pt: { prefixes: ['Sol', 'Luz', 'Monte', 'Brisa', 'Estrela', 'Flor', 'Lua', 'Vale', 'Ouro', 'Mar'], suffixes: ['eiro', 'eira', 'inho', 'inha', 'ado', 'ada', 'oso', 'osa', 'ano', 'ela'], titleWords: ['o Valente', 'a Estrela', 'o Guardião', 'a Sombra'], vowels: ['a','e','i','o','u','ã','õ'], consonants: ['b','c','d','f','g','j','l','m','n','p','r','s','t','v','z'] },
+  tr: { prefixes: ['Ay', 'Gök', 'Yıldız', 'Demir', 'Ateş', 'Kara', 'Ak', 'Deniz', 'Alp', 'Güneş'], suffixes: ['han', 'can', 'ay', 'taş', 'soy', 'demir', 'er', 'nur', 'kaya', 'alp'], titleWords: ['Cesur', 'Koruyucu', 'Gölge Kılıcı', 'Yolcu'], vowels: ['a','e','ı','i','o','ö','u','ü'], consonants: ['b','ç','d','g','ğ','k','l','m','n','r','s','ş','t','y','z'] },
+  ko: { prefixes: ['하늘', '별', '달', '빛', '바람', '은', '진', '서', '민', '유'], suffixes: ['준', '아', '윤', '호', '린', '우', '현', '솔', '빈', '라'], titleWords: ['용감한 자', '수호자', '그림자 검', '방랑자'], vowels: [], consonants: [] },
+  zh: { prefixes: ['星', '云', '风', '月', '明', '龙', '天', '雪', '灵', '青'], suffixes: ['辰', '岚', '影', '霖', '宇', '瑶', '轩', '宁', '羽', '阳'], titleWords: ['勇者', '守护者', '影之刃', '流浪者'], vowels: [], consonants: [] },
+  ru: { prefixes: ['Звезд', 'Волк', 'Мороз', 'Свет', 'Злат', 'Север', 'Яро', 'Миро', 'Влад', 'Луна'], suffixes: ['мир', 'слав', 'вич', 'ова', 'ев', 'ин', 'ая', 'ский', 'рад', 'гор'], titleWords: ['Храбрый', 'Хранитель', 'Теневой клинок', 'Странник'], vowels: [], consonants: [] },
+  hi: { prefixes: ['आरव', 'देव', 'सूर्य', 'चंद्र', 'नील', 'राज', 'किरण', 'आनंद', 'वीर', 'ईशा'], suffixes: ['अंश', 'दीप', 'राज', 'ईश', 'इका', 'इंद्र', 'वीर', 'इता', 'अंशु', 'ओम'], titleWords: ['वीर', 'रक्षक', 'छाया तलवार', 'यात्री'], vowels: [], consonants: [] },
+  nl: { prefixes: ['Ster', 'Woud', 'Goud', 'Storm', 'Maan', 'Vuur', 'Zilver', 'Noord', 'Wolf', 'Droom'], suffixes: ['berg', 'veld', 'man', 'dam', 'burg', 'hout', 'wijk', 'meer', 'rijk', 'land'], titleWords: ['de Dappere', 'de Wachter', 'het Schaduwzwaard', 'de Reiziger'], vowels: ['a','e','i','o','u','ij'], consonants: ['b','d','f','g','h','k','l','m','n','r','s','t','v','w','z'] },
+  pl: { prefixes: ['Gwiazd', 'Wilk', 'Złot', 'Cień', 'Mroź', 'Jas', 'Wich', 'Kamień', 'Las', 'Srebr'], suffixes: ['owski', 'wicz', 'mir', 'sław', 'bor', 'ek', 'ak', 'ina', 'ora', 'yn'], titleWords: ['Odważny', 'Strażnik', 'Miecz Cienia', 'Wędrowiec'], vowels: ['a','e','i','o','u','y'], consonants: ['b','c','d','k','l','m','n','p','r','s','t','w','z','ł'] },
+  sv: { prefixes: ['Stjärn', 'Skog', 'Järn', 'Guld', 'Norr', 'Frost', 'Björn', 'Mån', 'Storm', 'Silver'], suffixes: ['berg', 'ström', 'lund', 'gren', 'holm', 'son', 'borg', 'mark', 'kvist', 'dal'], titleWords: ['den Modige', 'Väktaren', 'Skuggsvärdet', 'Vandraren'], vowels: ['a','e','i','o','u','y','å','ä','ö'], consonants: ['b','d','f','g','h','k','l','m','n','r','s','t','v'] },
+  vi: { prefixes: ['Minh', 'An', 'Bảo', 'Thiên', 'Ngọc', 'Quang', 'Hải', 'Lan', 'Linh', 'Tâm'], suffixes: ['anh', 'bình', 'chi', 'dương', 'huy', 'khanh', 'linh', 'nam', 'phúc', 'vy'], titleWords: ['Dũng Sĩ', 'Người Bảo Hộ', 'Kiếm Bóng Tối', 'Lữ Khách'], vowels: ['a','ă','â','e','ê','i','o','ô','ơ','u','ư','y'], consonants: ['b','c','d','đ','g','h','k','l','m','n','p','q','r','s','t','v','x'] },
+  id: { prefixes: ['Bintang', 'Cahaya', 'Banyu', 'Surya', 'Mega', 'Bayu', 'Candra', 'Indra', 'Jaya', 'Wira'], suffixes: ['putra', 'dewi', 'sari', 'wan', 'wati', 'jaya', 'kusuma', 'adi', 'tara', 'ning'], titleWords: ['Sang Pemberani', 'Penjaga', 'Pedang Bayangan', 'Pengembara'], vowels: ['a','e','i','o','u'], consonants: ['b','c','d','g','h','j','k','l','m','n','p','r','s','t','w','y'] },
+  th: { prefixes: ['ดาว', 'ฟ้า', 'แสง', 'จันทร์', 'นที', 'ธารา', 'นภา', 'กานต์', 'ศิลา', 'พิม'], suffixes: ['พร', 'ชัย', 'ภัทร', 'วัฒน์', 'ริน', 'กานต์', 'พล', 'นภา', 'มณี', 'ธร'], titleWords: ['ผู้กล้า', 'ผู้พิทักษ์', 'ดาบเงา', 'นักเดินทาง'], vowels: [], consonants: [] },
+  el: { prefixes: ['Αστέρ', 'Ήλιο', 'Νικο', 'Δωρο', 'Καλλ', 'Θεο', 'Ξενο', 'Δημητ', 'Ελένη', 'Κυρ'], suffixes: ['ανδρος', 'ια', 'ος', 'ης', 'ευς', 'ινα', 'οδωρ', 'ικος', 'αιων', 'αρα'], titleWords: ['ο Γενναίος', 'ο Φύλακας', 'η Σκιά', 'ο Περιπλανώμενος'], vowels: [], consonants: [] },
+  he: { prefixes: ['אור', 'נועם', 'ארי', 'אלי', 'שי', 'טל', 'זיו', 'לב', 'גל', 'ניר'], suffixes: ['אל', 'יה', 'אור', 'עמי', 'אלי', 'יה', 'אבי', 'רון', 'דן', 'לי'], titleWords: ['האמיץ', 'השומר', 'חרב הצללים', 'הנודד'], vowels: [], consonants: [] },
+  cs: { prefixes: ['Hvězd', 'Les', 'Zlat', 'Stín', 'Mraz', 'Větr', 'Kamen', 'Běl', 'Vlč', 'Slun'], suffixes: ['ek', 'ák', 'ík', 'ova', 'oslav', 'mir', 'an', 'ena', 'ice', 'rad'], titleWords: ['Odvážný', 'Strážce', 'Stínový meč', 'Poutník'], vowels: ['a','e','i','o','u','y','á','é','í'], consonants: ['b','d','k','l','m','n','p','r','s','t','v','z','ř','č'] },
+  ro: { prefixes: ['Stea', 'Lup', 'Aur', 'Codr', 'Vânt', 'Lun', 'Argint', 'Flac', 'Dor', 'Mir'], suffixes: ['escu', 'eanu', 'aru', 'ina', 'el', 'an', 'ora', 'ica', 'uș', 'ian'], titleWords: ['Cel Viteaz', 'Păzitorul', 'Sabia Umbrei', 'Călătorul'], vowels: ['a','ă','â','e','i','î','o','u'], consonants: ['b','c','d','f','g','h','l','m','n','p','r','s','t','v','z','ș','ț'] },
+  da: { prefixes: ['Stjerne', 'Skov', 'Jern', 'Guld', 'Nord', 'Frost', 'Måne', 'Storm', 'Sølv', 'Ulv'], suffixes: ['berg', 'lund', 'holm', 'sen', 'gaard', 'mark', 'dal', 'borg', 'strøm', 'vig'], titleWords: ['den Modige', 'Vogteren', 'Skyggesværdet', 'Vandreren'], vowels: ['a','e','i','o','u','y','æ','ø','å'], consonants: ['b','d','f','g','h','k','l','m','n','r','s','t','v'] },
+  fi: { prefixes: ['Tähti', 'Metsä', 'Kulta', 'Varjo', 'Jää', 'Pohja', 'Susi', 'Kuura', 'Valo', 'Rauta'], suffixes: ['nen', 'la', 'lä', 'maa', 'järvi', 'koski', 'virta', 'saari', 'mäki', 'kari'], titleWords: ['Rohkea', 'Vartija', 'Varjomiekka', 'Vaeltaja'], vowels: ['a','e','i','o','u','y','ä','ö'], consonants: ['h','j','k','l','m','n','p','r','s','t','v'] },
+  uk: { prefixes: ['Зоря', 'Вовк', 'Мороз', 'Світ', 'Злат', 'Північ', 'Яро', 'Мир', 'Влад', 'Ніч'], suffixes: ['мир', 'слав', 'вич', 'ова', 'ко', 'ук', 'енко', 'гор', 'рад', 'ян'], titleWords: ['Хоробрий', 'Вартовий', 'Тіньовий клинок', 'Мандрівник'], vowels: [], consonants: [] },
+  bn: { prefixes: ['আকাশ', 'নদী', 'চাঁদ', 'সূর্য', 'তারা', 'বন', 'মেঘ', 'অগ্নি', 'পদ্ম', 'সাগর'], suffixes: ['নাথ', 'দেব', 'কুমার', 'চন্দ্র', 'দীপ', 'রঞ্জন', 'শঙ্কর', 'মিত্র', 'বর্মণ', 'লতা'], titleWords: ['সাহসী', 'রক্ষক', 'ছায়া-তরবারি', 'পথিক'], vowels: [], consonants: [] },
+  nb: { prefixes: ['Fjell', 'Skog', 'Jern', 'Gull', 'Nord', 'Frost', 'Måne', 'Storm', 'Sølv', 'Ulv'], suffixes: ['berg', 'lund', 'vik', 'sen', 'stad', 'mark', 'dal', 'borg', 'fjord', 'heim'], titleWords: ['den Modige', 'Vokteren', 'Skyggesverdet', 'Vandreren'], vowels: ['a','e','i','o','u','y','æ','ø','å'], consonants: ['b','d','f','g','h','k','l','m','n','r','s','t','v'] },
+};
+
+/* =====================================================================
+   3. MULTI-STRATEGY GENERATION ENGINE
+===================================================================== */
+
+export type GenerationStrategy =
+  | 'phonetic_harmony'
+  | 'neologism'
+  | 'portmanteau_blend'
+  | 'symbolic_evocative'
+  | 'punchy_minimal'
+  | 'epic_compound';
+
+/**
+ * Strategy 1: Classical Syllable & Phonetic Harmony
+/**
+ * Intelligently combines prefix and suffix parts based on whether they are
+ * independent words/phrases (space-separated) or phoneme syllables (joined).
+ * Handles French elision, apostrophes, contractions (du, des, au, aux) and avoids truncated fragments.
+ */
+const FEMININE_ADJECTIVES: Record<string, string> = {
+  boiteux: 'boiteuse', joyeux: 'joyeuse', fringant: 'fringante', rieur: 'rieuse', borgne: 'borgne',
+  'ébréché': 'ébréchée', 'rouillé': 'rouillée', 'noyé': 'noyée', 'échoué': 'échouée', sanguin: 'sanguine',
+  'fumé': 'fumée', 'oublié': 'oubliée', funeste: 'funeste', 'éternel': 'éternelle', souterrain: 'souterraine',
+  'perdu': 'perdue', 'sauvage': 'sauvage', gris: 'grise', moderne: 'moderne', 'élégant': 'élégante',
+  urbain: 'urbaine', 'maudit': 'maudite', 'ancien': 'ancienne', 'sacré': 'sacrée', 'doré': 'dorée',
+  'secret': 'secrète', 'silencieux': 'silencieuse', 'mystérieux': 'mystérieuse', 'dernier': 'dernière',
+  'premier': 'première', 'vieux': 'vieille', 'noir': 'noire', 'blanc': 'blanche', 'brave': 'brave',
+  'ardent': 'ardente', 'divin': 'divine', 'foudroyant': 'foudroyante', 'brûlé': 'brûlée',
+  'interdit': 'interdite', 'mort': 'morte', 'ailé': 'ailée', 'furtif': 'furtive',
+  'réparateur': 'réparatrice', 'serein': 'sereine', 'profond': 'profonde', 'scellé': 'scellée',
+  'suspendu': 'suspendue', 'pur': 'pure', 'lumineux': 'lumineuse', 'brillant': 'brillante',
+  'bioluminescent': 'bioluminescente', 'étoilé': 'étoilée', 'abyssal': 'abyssale', 'nacré': 'nacrée',
+  'flottant': 'flottante', 'boréal': 'boréale', 'austral': 'australe', 'glacial': 'glaciale',
+  'immaculé': 'immaculée', 'étincelant': 'étincelante', 'enchanteur': 'enchanteresse',
+};
+const MASCULINE_ADJECTIVES: Record<string, string> = Object.fromEntries(
+  Object.entries(FEMININE_ADJECTIVES)
+    .filter(([masc, fem]) => masc !== fem)
+    .map(([masc, fem]) => [fem, masc])
+);
+const FEMININE_HEAD_NOUNS = new Set([
+  'épée', 'ancre', 'chope', 'lanterne', 'fosse', 'crypte', 'gorge', 'caverne', 'citadelle', 'crevasse',
+  'nécropole', 'échoppe', 'galerie', 'bulle', 'maison', 'tour', 'auberge', 'taverne', 'forge', 'étoile',
+  'ombre', 'brume', 'flamme', 'lame', 'couronne', 'table', 'ruche', 'oasis', 'clef', 'clé', 'harpe',
+  'serre', 'danse', 'nuée', 'île', 'anse', 'crique', 'baie', 'rade', 'plaine', 'faille', 'terre', 'zone',
+  'frappe', 'bénédiction', 'invocation', 'révélation', 'colère', 'tempête', 'porte', 'griffe', 'plume',
+  'forêt', 'sylve', 'futaie', 'clairière', 'feuille', 'ronce', 'liane', 'fleur', 'urne', 'racine', 'plante',
+  'gueule', 'spore', 'méduse', 'bête', 'lueur', 'réserve', 'jungle', 'vallée', 'aiguille', 'dent', 'crête',
+  'roche', 'barrière', 'passe', 'source', 'vasque', 'fumerolle', 'bouche', 'palmeraie', 'fontaine', 'halte',
+  'amanite', 'fonge', 'pyramide', 'quête', 'cuirasse', 'égide', 'cotte', 'armure', 'cape', 'potion',
+  'décoction', 'larme', 'essence', 'goutte', 'relique', 'amulette', 'capsule', 'caisse', 'lyre', 'flèche',
+  'expédition', 'mission', 'opération', 'campagne', 'revue', 'gazette', 'nuit', 'voie', 'artère',
+  'colonie', 'cité', 'nouvelle', 'comète', 'foudre', 'matrice', 'flotte', 'sonde', 'mer', 'vague',
+]);
+const MASCULINE_HEAD_NOUNS = new Set([
+  'port', 'roc', 'désert', 'cratère', 'jugement', 'éclair', 'bouclier', 'essaim', 'nuage', 'réseau',
+  'bois', 'bosquet', 'val', 'tombeau', 'mastaba', 'caveau', 'temple', 'réveil', 'secret', 'retour',
+  'calice', 'harnois', 'plastron', 'élixir', 'filtre', 'breuvage', 'coffre', 'reliquaire', 'pacte',
+  'dragon', 'phénix', 'cygne', 'navire', 'loup', 'projet', 'voyage', 'masque', 'atelier', 'silence',
+  'été', 'souffle', 'dôme', 'pont', 'gué', 'comptoir', 'marché', 'pic', 'mont', 'trône', 'récif',
+  'lagon', 'atoll', 'banc', 'jardin', 'îlot', 'sanctuaire', 'havre', 'refuge', 'domaine', 'vallon',
+  'geyser', 'bassin', 'jaillissement', 'puits', 'bolet', 'mycélium', 'chapeau', 'agaric', 'pleurote',
+  'poisson', 'calmar', 'siphonophore', 'massif', 'delta', 'parc', 'ours', 'harfang', 'renard',
+  'traqueur', 'colosse', 'poing', 'éclat', 'sceau', 'néant', 'raz-de-marée', 'squelette', 'givre',
+  'fleuve', 'monde', 'royaume', 'futur', 'temps', 'vent', 'cœur', 'matin', 'destin', 'mage', 'ciel',
+]);
+
+function inferFrenchNounGender(noun: string): 'f' | 'm' {
+  const clean = noun.trim().toLowerCase().replace(/^l['’]/, '');
+  if (FEMININE_HEAD_NOUNS.has(clean)) return 'f';
+  if (MASCULINE_HEAD_NOUNS.has(clean)) return 'm';
+  return /(e|ée|ière|ance|ence|ie|onne|esse|ion|té|ude|ure|ade)$/i.test(clean) ? 'f' : 'm';
+}
+
+function isFeminineHead(prefix: string): boolean {
+  const trimmed = prefix.trim();
+  const words = trimmed.split(/\s+/);
+  if (/^(la|une|nouvelle)$/i.test(words[0])) return true;
+  if (/^(le|un)$/i.test(words[0])) return false;
+  const head = words.length === 1 ? words[0] : '';
+  const stripped = head.replace(/^l['’]/i, '').toLowerCase();
+  return Boolean(stripped && FEMININE_HEAD_NOUNS.has(stripped));
+}
+
+function isMasculineHead(prefix: string): boolean {
+  const trimmed = prefix.trim();
+  const words = trimmed.split(/\s+/);
+  if (/^(le|un)$/i.test(words[0])) return true;
+  if (/^(la|une|nouvelle)$/i.test(words[0])) return false;
+  const head = words.length === 1 ? words[0] : '';
+  const stripped = head.replace(/^l['’]/i, '').toLowerCase();
+  return Boolean(stripped && MASCULINE_HEAD_NOUNS.has(stripped));
+}
+
+function smoothMorphemeJoin(front: string, backLower: string): string {
+  let left = front;
+  const right = backLower;
+  if (!left || !right) return `${left}${right}`;
+  const lastChar = left.slice(-1).toLowerCase();
+  const prevChar = left.slice(-2, -1).toLowerCase();
+  const firstChar = right.slice(0, 1).toLowerCase();
+  // Avoid double-consonant collision when front already ends in consonant cluster (e.g., Magm + maw -> Magmaw)
+  if (
+    lastChar === firstChar &&
+    /[b-df-hj-np-tv-z]/.test(lastChar) &&
+    /[b-df-hj-np-tv-z]/.test(prevChar)
+  ) {
+    left = left.slice(0, -1);
+  } else if (
+    lastChar === firstChar &&
+    /[aàâiîuûy]/.test(lastChar) &&
+    left.length >= 2 &&
+    right.length >= 2
+  ) {
+    // Avoid unnatural double a/i/u across bound morpheme joins (e.g., Ba + ack -> Back)
+    left = left.slice(0, -1);
+  }
+  return left + right;
+}
+
+function isFrenchPhrase(value: string, _language?: GenLanguageCode): boolean {
+  const s = String(value || '').trim();
+  if (!s) return false;
+  return (
+    /(?:^|\s)(?:le|la|les|du|des|de|un|une|au|aux|pour|sans|dans|sous|avec|sur|et)(?:\s|$)/i.test(s) ||
+    /(?:^|\s)[ld]['’]/i.test(s) ||
+    /[àâéèêëîïôùûüçœæ]/i.test(s)
+  );
+}
+
+export function combineParts(p: string, s: string, language: GenLanguageCode = 'fr'): string {
+  let cleanP = String(p || '').trim();
+  let cleanS = String(s || '').trim();
+  if (!cleanP) return cleanS;
+  if (!cleanS) return cleanP;
+
+  // French-only article/preposition contractions must not run for other locales.
+  if ((language === 'fr' || language === 'auto')) {
+    // Merge a trailing preposition with the article that starts the second part.
+    const prepMatch = cleanP.match(/^(.*?)\s*\b(du|des|de la|de l['’]|de|d['’])$/i);
+    const articleMatch = cleanS.match(/^(l['’]|la\s+|le\s+|les\s+)(.+)$/i);
+    if (prepMatch && articleMatch) {
+      const head = prepMatch[1] ? `${prepMatch[1]} ` : '';
+      const art = articleMatch[1].trim().toLowerCase().replace('’', "'");
+      const rest = articleMatch[2];
+      if (art === "l'") return cleanWord(`${head}de l’${rest}`);
+      if (art === 'la') return cleanWord(`${head}de la ${rest}`);
+      if (art === 'le') return cleanWord(`${head}du ${rest}`);
+      return cleanWord(`${head}des ${rest}`);
+    }
+  }
+
+  // Hyphenated toponyms ("Pic-" + "Gris" -> "Pic-gris")
+  if (/-$/.test(cleanP) && !/^[A-Z0-9][A-Z0-9-]*$/.test(cleanS) && !cleanS.includes(' ')) {
+    return cleanWord(cleanP + cleanS.toLowerCase());
+  }
+
+  // French adjective agreement is intentionally scoped to French output (bidirectional).
+  if ((language === 'fr' || language === 'auto') && !cleanS.includes(' ')) {
+    const lowerS = cleanS.toLowerCase();
+    if (isFeminineHead(cleanP)) {
+      const fem = FEMININE_ADJECTIVES[lowerS];
+      if (fem) cleanS = cap(fem);
+    } else if (isMasculineHead(cleanP)) {
+      const masc = MASCULINE_ADJECTIVES[lowerS];
+      if (masc) cleanS = cap(masc);
+    }
+  }
+
+  if ((language === 'fr' || language === 'auto')) {
+    // French preposition agreements and elisions
+    const vowelsRegex = /^[aàâeéèêiîoôuûhy]/i;
+    const firstWordS = cleanS.trim().split(' ')[0] || '';
+    const startsWithArticleS = /^(?:l['’]|la\s+|le\s+|les\s+|du\s+|des\s+|d['’]|au\s+|aux\s+)/i.test(cleanS);
+    const isPluralS = /[sx]$/i.test(firstWordS) && !/^(?:chaos|atlas|iris|lis|palais|bois|temps|univers|phénix|corps|mars)$/i.test(firstWordS);
+
+    if (isPluralS && !startsWithArticleS) {
+      if (/\bdu$/i.test(cleanP)) {
+        cleanP = cleanP.replace(/\bdu$/i, 'des');
+      } else if (/\bd['’]un$/i.test(cleanP)) {
+        cleanP = cleanP.replace(/\bd['’]un$/i, 'des');
+      } else if (/\bde$/i.test(cleanP)) {
+        cleanP = cleanP.replace(/\bde$/i, 'des');
+      } else if (/\bde\s+la$/i.test(cleanP)) {
+        cleanP = cleanP.replace(/\bde\s+la$/i, 'des');
+      } else if (/\bde\s+l['’]$/i.test(cleanP)) {
+        cleanP = cleanP.replace(/\bde\s+l['’]$/i, 'des');
+      } else if (/\ble$/i.test(cleanP)) {
+        cleanP = cleanP.replace(/\ble$/i, 'les');
+      } else if (/\bla$/i.test(cleanP)) {
+        cleanP = cleanP.replace(/\bla$/i, 'les');
+      }
+    } else if (!startsWithArticleS) {
+      // Normalize prepositions du / de la / de l’ / de based on noun initial/gender
+      if (/\b(?:du|de\s+la|de\s+l['’])$/i.test(cleanP)) {
+        if (vowelsRegex.test(cleanS)) {
+          cleanP = cleanP.replace(/\b(?:du|de\s+la|de\s+l['’])$/i, 'de l’');
+          return cleanWord(`${cleanP}${cleanS}`);
+        } else {
+          const isFem = inferFrenchNounGender(firstWordS) === 'f';
+          cleanP = cleanP.replace(/\b(?:du|de\s+la|de\s+l['’])$/i, isFem ? 'de la' : 'du');
+        }
+      } else if (/\bde$/i.test(cleanP)) {
+        if (vowelsRegex.test(cleanS)) {
+          cleanP = cleanP.replace(/\bde$/i, "d’");
+          return cleanWord(`${cleanP}${cleanS}`);
+        } else {
+          const isFem = inferFrenchNounGender(firstWordS) === 'f';
+          cleanP = cleanP.replace(/\bde$/i, isFem ? 'de la' : 'du');
+        }
+      } else if (/\bles$/i.test(cleanP)) {
+        if (/\bnaissent\s+les$/i.test(cleanP)) {
+          const isFem = inferFrenchNounGender(firstWordS) === 'f';
+          if (vowelsRegex.test(cleanS)) {
+            cleanP = cleanP.replace(/\bnaissent\s+les$/i, "naît l’");
+            return cleanWord(`${cleanP}${cleanS}`);
+          } else {
+            cleanP = cleanP.replace(/\bnaissent\s+les$/i, isFem ? 'naît la' : 'naît le');
+          }
+        } else {
+          const isFem = inferFrenchNounGender(firstWordS) === 'f';
+          if (vowelsRegex.test(cleanS)) {
+            cleanP = cleanP.replace(/\bles$/i, "l’");
+            return cleanWord(`${cleanP}${cleanS}`);
+          } else {
+            cleanP = cleanP.replace(/\bles$/i, isFem ? 'la' : 'le');
+          }
+        }
+      } else if (/\ble$/i.test(cleanP)) {
+        if (vowelsRegex.test(cleanS)) {
+          cleanP = cleanP.replace(/\ble$/i, "l’");
+          return cleanWord(`${cleanP}${cleanS}`);
+        } else if (inferFrenchNounGender(firstWordS) === 'f') {
+          cleanP = cleanP.replace(/\ble$/i, 'la');
+        }
+      }
+    }
+
+    if (/\bde\s+le$/i.test(cleanP)) {
+      cleanP = cleanP.replace(/\bde\s+le$/i, 'du');
+    } else if (/\bde\s+les$/i.test(cleanP)) {
+      cleanP = cleanP.replace(/\bde\s+les$/i, 'des');
+    } else if (/\bà\s+le$/i.test(cleanP)) {
+      cleanP = cleanP.replace(/\bà\s+le$/i, 'au');
+    } else if (/\bà\s+les$/i.test(cleanP)) {
+      cleanP = cleanP.replace(/\bà\s+les$/i, 'aux');
+    }
+  }
+
+  // Apostrophe attachment (e.g. "L'Atelier", "d'Émeraude", "Maison d'")
+  if (cleanP.endsWith("'") || cleanP.endsWith("’")) {
+    return cleanWord(cleanP + cleanS);
+  }
+
+  // If cleanS starts with l' or d' (e.g. "l’Ancien", "l’Ombre", "d’Or") or articles (le, la, les, du, des)
+  if (/^[ld]['’]/i.test(cleanS) || /^(?:le|la|les|du|des|au|aux)\s+/i.test(cleanS)) {
+    return cleanWord(`${cleanP} ${cleanS}`);
+  }
+
+  // Check if either part contains spaces or punctuation
+  const pHasSpace = cleanP.includes(' ');
+  const sHasSpace = cleanS.includes(' ');
+
+  // Roman numerals, single capital letters and all-caps tags (III, B, MK-IV, X) keep their case.
+  // Hyphen-ended prefixes (Kepler-, Terra-) are glued without a space; otherwise a space is used.
+  if (/^[A-Z0-9][A-Z0-9-]*$/.test(cleanS) && !/^(ix|ex|iq)$/i.test(cleanS)) {
+    return /-$/.test(cleanP) ? cleanWord(cleanP + cleanS) : cleanWord(`${cleanP} ${cleanS}`);
+  }
+  // All-caps abbreviations used as prefixes (USS, HMS, SS) are always separate words.
+  if (/^[A-Z]{2,4}$/.test(cleanP)) {
+    return cleanWord(`${cleanP} ${cleanS}`);
+  }
+
+  // Bound inflectional/derivative suffixes that should be glued (e.g. -ix, -ex, -ify, -ora, -ly, -ien, -ette)
+  const isBoundSuffix = /^(ix|ex|iq|ify|ly|ia|um|is|us|os|or|on|en|el|ar|er|ine|elle|ette|ance|ence|ium|oid|to|ki|ya|shi|jin|ka|ro)$/i.test(
+    cleanS
+  );
+
+  if (pHasSpace || sHasSpace) {
+    return cleanWord(`${cleanP} ${cleanS}`);
+  }
+
+  // If both parts look like capitalized standalone words and not bound suffixes
+  const isWordP = cleanP.length >= 4 || /^[A-ZÀ-ÿ][a-zà-ÿ]{2,}$/.test(cleanP);
+  const isWordS = cleanS.length >= 3 && /^[A-ZÀ-ÿ]/.test(cleanS);
+
+  if (isWordP && isWordS && !isBoundSuffix) {
+    return cleanWord(`${cleanP} ${cleanS}`);
+  }
+
+  return cleanWord(smoothMorphemeJoin(cleanP, cleanS.toLowerCase()));
+}
+
+/**
+ * Strategy 1: Classical Syllable & Phonetic Harmony
+ */
+function generatePhoneticHarmony(
+  d: SubcategoryData,
+  length: LengthOption,
+  genLang: GenLanguageCode,
+  useLanguageRoots = genLang !== 'auto'
+): string {
+  const langRules = LANGUAGE_PHONETICS[genLang] || LANGUAGE_PHONETICS.auto;
+  // Explicit language roots are selected only after the generator-family policy allows them.
+  // "auto" keeps the generator's category-specific vocabulary.
+  const prefixes =
+    useLanguageRoots && langRules.prefixes.length > 0
+      ? langRules.prefixes
+      : d.prefixes;
+  const suffixes =
+    useLanguageRoots && langRules.suffixes.length > 0
+      ? langRules.suffixes
+      : d.suffixes;
+
+  const p = (randomItem(prefixes) as string) || (d.prefixes[0] || 'Nova');
+  const s = (randomItem(suffixes) as string) || (d.suffixes[0] || 'is');
+  const m = (randomItem(d.middle || []) as string) || '';
+
+  if (length === 'short') {
+    const shortSuffixes = suffixes.filter((x) => countOrthographicUnits(x, genLang) <= 3 && !x.includes(' ') && !x.includes("'"));
+    const chosenS = shortSuffixes.length > 0 ? (randomItem(shortSuffixes) as string) : s;
+    const shortPrefixes = prefixes.filter((x) => countOrthographicUnits(x, genLang) <= 4 && !x.includes(' ') && !x.includes("'"));
+    const chosenP = shortPrefixes.length > 0 ? (randomItem(shortPrefixes) as string) : p;
+    return combineParts(chosenP, chosenS, genLang);
+  }
+  if (length === 'long') {
+    if (m) {
+      return combineParts(combineParts(p, m, genLang), s, genLang);
+    }
+    const longPrefixes = prefixes.filter((x) => countOrthographicUnits(x, genLang) >= 5 || x.includes(' '));
+    const chosenP = longPrefixes.length > 0 ? (randomItem(longPrefixes) as string) : p;
+    return combineParts(chosenP, s, genLang);
+  }
+  return combineParts(p, s, genLang);
+}
+
+/**
+ * Strategy 2: Neologism (Constructed pronounceable words from category's own vocabulary)
+ */
+function generateNeologism(
+  d: SubcategoryData,
+  length: LengthOption,
+  genLang: GenLanguageCode,
+  useLanguageRoots = genLang !== 'auto'
+): string {
+  // Never cut a native-script word into arbitrary UTF-16 fragments. Whole-token
+  // languages stay on complete vocabulary items until reviewed phoneme models exist.
+  if (requiresWholeTokenGeneration(genLang)) {
+    return generatePhoneticHarmony(d, length, genLang, useLanguageRoots);
+  }
+  // Only use standalone non-acronym words >= 4 chars so acronyms/short words (BSD, OS, Pay) aren't sliced into fragments
+  const langRules = LANGUAGE_PHONETICS[genLang] || LANGUAGE_PHONETICS.auto;
+  const sourcePrefixes = useLanguageRoots && langRules.prefixes.length ? langRules.prefixes : d.prefixes;
+  const sourceSuffixes = useLanguageRoots && langRules.suffixes.length ? langRules.suffixes : d.suffixes;
+  const singleWords = [...sourcePrefixes, ...sourceSuffixes].filter(
+    (w) =>
+      !w.includes(' ') &&
+      !w.includes("'") &&
+      !w.includes('’') &&
+      !/[A-Z]{2,}|[0-9._-]/.test(w) &&
+      w.length >= 4
+  );
+  if (singleWords.length >= 2) {
+    for (let retry = 0; retry < 4; retry++) {
+      const w1 = randomItem(singleWords) || 'Nova';
+      const w2 = randomItem(singleWords) || 'Velo';
+      if (w1.toLowerCase() === w2.toLowerCase()) continue;
+      const cut1 = Math.max(2, Math.min(w1.length - 1, Math.floor(w1.length * 0.6)));
+      const cut2 = Math.max(1, Math.min(w2.length - 2, Math.floor(w2.length * 0.4)));
+      const p1 = w1.slice(0, cut1);
+      const p2 = w2.slice(cut2).toLowerCase();
+      // Require pronounceable onset & nucleus in the second slice, and reject awkward consonant tails
+      if (!/[aeiouyà-ÿ]/i.test(p1) || !/[aeiouyà-ÿ]/i.test(p2)) continue;
+      if (/^[^aeiouyà-ÿ]{2,}/i.test(p2) && !/^(?:st|sp|str|tr|cr|pr|bl|cl|fl|gl|br|dr|fr|gr)/i.test(p2)) continue;
+      if (/(?:nc|mk|pk|bk|dk|vq|bx)$/i.test(p2)) continue;
+      if (/[b-df-hj-np-tv-z]{3,}$/i.test(p1) || /[b-df-hj-np-tv-z]{3,}/i.test(p1.slice(-2) + p2.slice(0, 2))) continue;
+      const combined = cleanWord(cap(smoothMorphemeJoin(p1, p2)));
+      if (combined.length >= 4 && combined.length <= 14 && !/([aieu])\1/i.test(combined)) {
+        return combined;
+      }
+    }
+  }
+  return generatePhoneticHarmony(d, length, genLang, useLanguageRoots);
+}
+
+/**
+ * Strategy 3: Portmanteau Blend (Blending two distinct evocative roots)
+ */
+function generatePortmanteauBlend(
+  d: SubcategoryData,
+  genLang: GenLanguageCode,
+  useLanguageRoots = genLang !== 'auto'
+): string {
+  const langRules = LANGUAGE_PHONETICS[genLang] || LANGUAGE_PHONETICS.auto;
+  const rootsA = useLanguageRoots && langRules.prefixes.length
+    ? langRules.prefixes
+    : (d.prefixes.length > 0 ? d.prefixes : ['Nova', 'Kaly', 'Velo', 'Aero', 'Zeta', 'Sol']);
+  const rootsB = useLanguageRoots && langRules.suffixes.length
+    ? langRules.suffixes
+    : (d.suffixes.length > 0 ? d.suffixes : ['tech', 'flow', 'is', 'ora', 'craft', 'wave']);
+
+  const first = (randomItem(rootsA) as string) || 'Nova';
+  const second = (randomItem(rootsB) as string) || 'craft';
+
+  // Whole-token scripts must preserve complete lexical items; do not apply
+  // Latin vowel-dropping heuristics to kana, Han, Hangul or abugida text.
+  if (requiresWholeTokenGeneration(genLang)) {
+    return combineParts(first, second, genLang);
+  }
+
+  // If either contains spaces, apostrophes, acronyms, digits, or hyphens, combine cleanly as distinct words
+  if (
+    first.includes(' ') ||
+    second.includes(' ') ||
+    first.includes("'") ||
+    second.includes("'") ||
+    /[A-Z]{2,}|[0-9._-]/.test(first + second) ||
+    first.length > 10
+  ) {
+    return combineParts(first, second, genLang);
+  }
+
+  // Smooth blending transition: drop trailing vowel of first if second starts with vowel
+  let front = first;
+  let back = second.toLowerCase();
+  if (/[aeiouy]$/i.test(front) && /^[aeiouy]/i.test(back)) {
+    front = front.slice(0, -1);
+  }
+  return cleanWord(smoothMorphemeJoin(front, back));
+}
+
+/**
+ * Strategy 4: Symbolic & Evocative Root Composition
+ */
+function generateSymbolicEvocative(
+  generatorId: GeneratorId,
+  d: SubcategoryData,
+  genLang: GenLanguageCode,
+  useLanguageRoots = genLang !== 'auto'
+): string {
+  const symbolicMap: Record<string, string[]> = {
+    brand: ['Aura', 'Lumi', 'Pure', 'Vesta', 'Sol', 'Verve', 'Cael', 'Nobil'],
+    fantasy: ['Ael', 'Myth', 'Sylv', 'Astra', 'Rune', 'Eldar', 'Ignis', 'Chrono'],
+    startup: ['Veloce', 'Pulse', 'Hyper', 'Nexus', 'Vertex', 'Synt', 'Kinet', 'Apex'],
+    dragon: ['Pyros', 'Drak', 'Ignar', 'Volcan', 'Brim', 'Scal', 'Vapour', 'Terror'],
+    gamertag: ['Vex', 'Rift', 'Apex', 'Strike', 'Ghost', 'Zen', 'Kyo', 'Raze'],
+    boss: ['Mael', 'Nox', 'Malok', 'Gor', 'Zul', 'Khar', 'Dread', 'Void'],
+    weapon: ['Chante', 'Fend', 'Tranche', 'Aube', 'Givre', 'Foudre', 'Rune'],
+    starship: ['Vanguard', 'Aurora', 'Titan', 'Horizon', 'Endeavour', 'Aegis'],
+    cyberpunk: ['Chrome', 'Neon', 'Glitch', 'Spike', 'Wire', 'Cyber', 'Data'],
+  };
+
+  const langRules = LANGUAGE_PHONETICS[genLang] || LANGUAGE_PHONETICS.auto;
+  const pool = useLanguageRoots && langRules.prefixes.length
+    ? langRules.prefixes
+    : (symbolicMap[generatorId] || d.prefixes);
+  const root = randomItem(pool) || 'Nova';
+  const suffixPool = useLanguageRoots && langRules.suffixes.length
+    ? langRules.suffixes
+    : (d.suffixes.length > 0 ? d.suffixes : ['is', 'or', 'ex', 'ix', 'um', 'ia']);
+  const suffix = randomItem(suffixPool) || 'is';
+
+  return combineParts(root, suffix, genLang);
+}
+
+/**
+ * Strategy 5: Punchy Minimal (Compact, 1-2 sharp syllables)
+ */
+function generatePunchyMinimal(d: SubcategoryData, genLang: GenLanguageCode = 'auto', useLanguageRoots = genLang !== 'auto'): string {
+  const langRules = LANGUAGE_PHONETICS[genLang] || LANGUAGE_PHONETICS.auto;
+  const prefixes = useLanguageRoots && langRules.prefixes.length ? langRules.prefixes : d.prefixes;
+  const suffixes = useLanguageRoots && langRules.suffixes.length ? langRules.suffixes : d.suffixes;
+  const p = (randomItem(prefixes) as string) || 'Vex';
+  const s = (randomItem(suffixes) as string) || 'o';
+
+  // If p is a full multi-word phrase, combine cleanly without chopping
+  if (p.includes(' ') || s.includes(' ') || p.includes("'") || s.includes("'") || p.length > 8) {
+    return combineParts(p, s, genLang);
+  }
+
+  // Clean compact syllables
+  if (p.length <= 4 && s.length <= 3 && !/[A-Z]{2,}|[0-9._-]/.test(p + s)) {
+    return cleanWord(smoothMorphemeJoin(p, s.toLowerCase()));
+  }
+
+  const shortP = prefixes.find((x) => x.length <= 4 && !x.includes(' ') && !x.includes("'") && !/[A-Z]{2,}/.test(x)) || p.slice(0, 3);
+  const shortS = suffixes.find((x) => x.length <= 3 && !x.includes(' ') && !x.includes("'") && !/[A-Z]{2,}/.test(x)) || s.slice(0, 2);
+  return cleanWord(cap(smoothMorphemeJoin(shortP, shortS.toLowerCase())));
+}
+
+/**
+ * Clean up awkward triple letters, invalid clusters, and hanging prepositions
+ */
+function cleanWord(str: string): string {
+  // Collapse accidental triple letters, but leave roman numerals (III, XXX) untouched.
+  const collapsed = String(str)
+    .split(/(\s+)/)
+    .map((token) =>
+      /^[IVXLCDM]+$/.test(token)
+        ? token
+        : token
+            .replace(/([aeiouAEIOUà-ÿ])\1{2,}/gi, '$1')
+            .replace(/([b-df-hj-np-tv-zB-DF-HJ-NP-TV-Z])\1{2,}/gi, '$1$1')
+    )
+    .join('');
+  let res = normalize(collapsed.replace(/\s+/g, ' ').trim());
+  // Remove trailing dangling apostrophes or single-letter fragments
+  res = res.replace(/['’\-–]\s*$/, '').trim();
+  // Remove dangling articles/prepositions ONLY at word boundaries (never split accented words like Île, Fidèle, Néon!)
+  res = res.replace(/(?:^|\s)(?:de\s+l['’]?|d['’]|du|des|le|la|les|un|une|the|of|in|at|on|for|with|and|by)['’]?$/iu, '').trim();
+  return res;
+}
+
+/* =====================================================================
+   4. INTERNAL HEURISTIC SCORER
+===================================================================== */
+
+interface ScoredCandidate {
+  name: string;
+  score: number;
+  strategy: GenerationStrategy;
+}
+
+export function hasIncoherentMixedScript(value: string): boolean {
+  const scripts = getScriptsInText(value);
+  if (scripts.length <= 1) return false;
+  const japaneseScripts = new Set(['Han', 'Hiragana', 'Katakana']);
+  if (scripts.every((s) => japaneseScripts.has(s))) return false;
+  return true;
+}
+
+export function scoreCandidate(
+  name: string,
+  lengthOpt: LengthOption,
+  genderOpt: GenderOption,
+  allowMixedScripts = false
+): number {
+  if (!name || name.length < 2) return 0;
+
+  if (!allowMixedScripts && hasIncoherentMixedScript(name)) return 0;
+
+  // Guard against direct or near-identical famous trademark collisions
+  if (screenTrademarkSimilarity(name).matched) return 0;
+
+  // Strict rejection of incomplete fragments, dangling articles/prepositions
+  if (/(?:^|[\s'’])(?:de\s+l|d|l|de|du|des|le|la|les|un|une|the|of|in|at|on|for|with|and|by)['’]?$/i.test(name)) {
+    return 0;
+  }
+  if (/['’]$/.test(name)) return 0;
+  if (/\s+[a-zA-Z]$/.test(name)) return 0;
+  if (/(?<![\p{L}\p{M}])([\p{L}\p{M}]+)\s+\1(?![\p{L}\p{M}])/iu.test(name)) return 0; // duplicate consecutive words (e.g. "Zone Zone")
+  if (/\p{Script=Latin}/u.test(name) && /(?:ync|anc|onc|unc|enc)$/i.test(name) === false && /(?:nc|mk|pk|bk|dk|vq)$/i.test(name)) return 0;
+
+  let score = 70; // baseline acceptable quality
+
+  // Count Unicode letters instead of Latin-only characters so names in Arabic,
+  // CJK, Cyrillic and other scripts receive fair length scoring.
+  const len = Array.from(name.normalize('NFC').matchAll(/[\p{L}\p{M}]/gu)).length;
+
+  // Length compliance bonus/penalty
+  if (lengthOpt === 'short') {
+    if (len >= 3 && len <= 6) score += 20;
+    else if (len > 8) score -= 30;
+  } else if (lengthOpt === 'long') {
+    if (len >= 8) score += 20;
+    else if (len < 6) score -= 30;
+  } else {
+    if (len >= 5 && len <= 9) score += 15;
+    else if (len > 14) score -= 15;
+  }
+
+  // Apply Latin phonetic heuristics only when the name contains Latin letters.
+  // Vowel ratios are not meaningful for Arabic, Chinese, Japanese, etc.
+  const hasLatinLetters = /\p{Script=Latin}/u.test(name);
+  if (hasLatinLetters) {
+    const vowels = (name.match(/[aeiouyAEIOUYà-ÿ]/gi) || []).length;
+    const consonants = (name.match(/[b-df-hj-np-tv-zB-DF-HJ-NP-TV-Z]/gi) || []).length;
+    const ratio = vowels / Math.max(1, consonants);
+
+    if (ratio >= 0.4 && ratio <= 1.4) {
+      score += 15;
+    } else if (ratio < 0.25 || ratio > 2.5) {
+      score -= 25;
+    }
+
+    if (/[b-df-hj-np-tv-z]{4,}/i.test(name)) {
+      score -= 30;
+    }
+  }
+
+  // Gender nuance scoring
+  if (genderOpt === 'female') {
+    if (/[aei]$/i.test(name) || /^(Ael|Mira|Sera|Lira|Yuna|Ela|Rose|Iris|Flora)/i.test(name)) {
+      score += 15;
+    }
+  } else if (genderOpt === 'male') {
+    if (/(?:or|un|an|us|ar|ok|el|en)$/i.test(name) || /^(Kael|Thar|Ryn|Aren|Marc|Léo|Liam|Louis)/i.test(name)) {
+      score += 15;
+    }
+  }
+
+  return Math.min(100, Math.max(0, score));
+}
+
+/* =====================================================================
+   5. HISTORY AND RECENT NAMES WINDOW
+===================================================================== */
+
+function getRecentNames(): string[] {
+  if (deterministicMode) return []; // seeded batches must not depend on previous history
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return [];
+    const raw = localStorage.getItem(RECENT_NAMES_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    // Guard against corrupted storage (object, null, numbers…) so later .some()/.filter() calls cannot throw.
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+function recordRecentNames(names: string[]): void {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    const current = getRecentNames();
+    const updated = Array.from(new Set([...names, ...current])).slice(0, RECENT_LIMIT);
+    localStorage.setItem(RECENT_NAMES_KEY, JSON.stringify(updated));
+  } catch {
+    // ignore
+  }
+}
+
+/* =====================================================================
+   6. METADATA & PRONUNCIATION
+===================================================================== */
+
+function generatePronunciation(name: string): string {
+  const hasLatin = /[A-Za-zÀ-ÿ]/.test(name);
+  if (hasLatin) {
+    const clean = name.replace(/[^A-Za-zÀ-ÿ ]/g, '').trim();
+    if (clean) {
+      const parts = clean.split(/\s+/);
+      const phoneticParts = parts.map((part) => {
+        if (part.length <= 3) return part.toUpperCase();
+        const half = Math.ceil(part.length / 2);
+        return `${part.slice(0, half).toLowerCase()}-${part.slice(half).toUpperCase()}`;
+      });
+      return `[${phoneticParts.join(' ')}]`;
+    }
+  }
+  const nonLatinClean = String(name || '')
+    .replace(/[^\p{L}\p{M}\p{N} ]/gu, '')
+    .trim();
+  if (!nonLatinClean) return '[—]';
+  const tokens = nonLatinClean.split(/\s+/).filter(Boolean);
+  return `[${tokens.join(' · ')}]`;
+}
+
+function buildProfessionalMetadata(
+  name: string,
+  generatorId: GeneratorId,
+  styleLabel: string,
+  length: LengthOption,
+  language: GenLanguageCode = 'auto'
+): {
+  strengths: string[];
+  watchouts: string[];
+  disclaimer?: string;
+  origin: string;
+} {
+  const meta = GENERATORS_METADATA[generatorId];
+  const isBusiness =
+    meta?.category === 'business' ||
+    [
+      'brand',
+      'business',
+      'product',
+      'startup',
+      'shop',
+      'domain',
+      'app',
+      'feature',
+      'service',
+      'slogan',
+      'crypto_token',
+      'software_tool',
+      'ecommerce_store',
+      'marketing_agency',
+    ].includes(generatorId);
+
+  const strengths: string[] = [];
+  const watchouts: string[] = [];
+
+  if (length === 'short') {
+    strengths.push('Excellente mémorisation immédiate', 'Idéal sur petits écrans, avatars et callouts');
+    watchouts.push('Les noms courts sont très demandés sur les extensions .com');
+  } else if (length === 'long') {
+    strengths.push('Grande richesse narrative', 'Forte distinction face à la concurrence');
+    watchouts.push('Testez la lisibilité rapide sur supports imprimés et en affichage réduit');
+  } else {
+    strengths.push('Équilibre entre originalité et fluidité', 'Format facile à comparer et à tester auprès du public cible');
+    watchouts.push('Vérifiez l’absence d’homonymes proches dans votre univers');
+  }
+
+  if (isBusiness) {
+    strengths.push('Point de départ pour construire une identité de marque cohérente');
+    watchouts.push('Faites tester la prononciation, l’orthographe et la mémorisation auprès du public cible');
+    watchouts.push('Vérifiez séparément les marques (INPI, EUIPO, USPTO selon le marché), les noms de domaine et les identifiants sociaux');
+  } else {
+    strengths.push(`Fidèle à l’archétype ${styleLabel}`, 'Immersion thématique immédiate');
+  }
+
+  const disclaimer = isBusiness
+    ? 'Avertissement : proposition créative uniquement. NameForge ne vérifie ni la disponibilité juridique, ni les domaines, ni les identifiants sociaux. Effectuez ces recherches avant toute utilisation commerciale.'
+    : JAPANESE_ANIME_GENERATORS.has(generatorId) && language === 'ja'
+      ? 'Experimental Japanese-inspired output. These generated forms are not verified or attested Japanese names; katakana rendering is a controlled approximation, and naturalness and category fit require review by a Japanese-language reviewer.'
+      : undefined;
+
+  const origin = `Forge NameForge • Archétype ${styleLabel}`;
+
+  return { strengths, watchouts, disclaimer, origin };
+}
+
+/* =====================================================================
+   7. MAIN EXPORTED FUNCTION
+===================================================================== */
+
+/* Localized group words for the "group" format (used when a generation language is selected). */
+const GROUP_WORDS: Record<string, { business: string[]; innovation: string[]; fantasy: string[]; other: string[] }> = {
+  fr: { business: ['Atelier', 'Studio', 'Maison', 'Collectif', 'Agence'], innovation: ['Lab', 'Réseau', 'Système', 'Noyau', 'Projet'], fantasy: ['Ordre', 'Clan', 'Guilde', 'Cercle', 'Légion'], other: ['Collectif', 'Club', 'Troupe', 'Cercle', 'Équipe'] },
+  en: { business: ['Studio', 'House of', 'Collective', 'Group', 'Agency'], innovation: ['Lab', 'Engine', 'System', 'Network', 'Core'], fantasy: ['Order of', 'Clan', 'Guild of', 'Circle of', 'Legion of'], other: ['Collective', 'Club', 'Troupe', 'Circle', 'Crew'] },
+  es: { business: ['Taller', 'Estudio', 'Casa', 'Colectivo', 'Agencia'], innovation: ['Laboratorio', 'Red', 'Sistema', 'Núcleo', 'Proyecto'], fantasy: ['Orden', 'Clan', 'Gremio', 'Círculo', 'Legión'], other: ['Colectivo', 'Club', 'Compañía', 'Círculo', 'Equipo'] },
+  de: { business: ['Atelier', 'Studio', 'Haus', 'Kollektiv', 'Agentur'], innovation: ['Labor', 'Netzwerk', 'System', 'Kern', 'Projekt'], fantasy: ['Orden', 'Clan', 'Gilde', 'Zirkel', 'Legion'], other: ['Kollektiv', 'Club', 'Truppe', 'Kreis', 'Team'] },
+  it: { business: ['Bottega', 'Studio', 'Casa', 'Collettivo', 'Agenzia'], innovation: ['Laboratorio', 'Rete', 'Sistema', 'Nucleo', 'Progetto'], fantasy: ['Ordine', 'Clan', 'Gilda', 'Cerchio', 'Legione'], other: ['Collettivo', 'Club', 'Compagnia', 'Cerchio', 'Squadra'] },
+  pt: { business: ['Ateliê', 'Estúdio', 'Casa', 'Coletivo', 'Agência'], innovation: ['Laboratório', 'Rede', 'Sistema', 'Núcleo', 'Projeto'], fantasy: ['Ordem', 'Clã', 'Guilda', 'Círculo', 'Legião'], other: ['Coletivo', 'Clube', 'Trupe', 'Círculo', 'Equipa'] },
+  ar: { business: ['مشغل', 'استوديو', 'دار', 'تجمّع', 'وكالة'], innovation: ['مختبر', 'شبكة', 'نظام', 'نواة', 'مشروع'], fantasy: ['رتبة', 'عشيرة', 'نقابة', 'حلقة', 'فيلق'], other: ['تجمّع', 'نادي', 'فرقة', 'حلقة', 'فريق'] },
+  tr: { business: ['Atölye', 'Stüdyo', 'Konak', 'Kolektif', 'Ajans'], innovation: ['Laboratuvar', 'Ağ', 'Sistem', 'Çekirdek', 'Proje'], fantasy: ['Tarikat', 'Klan', 'Lonca', 'Çember', 'Lejyon'], other: ['Kolektif', 'Kulüp', 'Topluluk', 'Çember', 'Ekip'] },
+  ja: { business: ['工房', 'スタジオ', '館', '集団', 'エージェンシー'], innovation: ['ラボ', 'ネットワーク', 'システム', 'コア', 'プロジェクト'], fantasy: ['騎士団', '一族', 'ギルド', '結社', '軍団'], other: ['集団', 'クラブ', '一座', 'サークル', 'チーム'] },
+  ko: { business: ['공방', '스튜디오', '하우스', '컬렉티브', '에이전시'], innovation: ['연구소', '네트워크', '시스템', '코어', '프로젝트'], fantasy: ['기사단', '일족', '길드', '결사', '군단'], other: ['집단', '클럽', '극단', '서클', '팀'] },
+  zh: { business: ['工坊', '工作室', '之家', '联盟', '机构'], innovation: ['实验室', '网络', '系统', '核心', '计划'], fantasy: ['骑士团', '氏族', '公会', '议会', '军团'], other: ['团体', '俱乐部', '剧团', '圈子', '小队'] },
+  ru: { business: ['Мастерская', 'Студия', 'Дом', 'Коллектив', 'Агентство'], innovation: ['Лаборатория', 'Сеть', 'Система', 'Ядро', 'Проект'], fantasy: ['Орден', 'Клан', 'Гильдия', 'Круг', 'Легион'], other: ['Коллектив', 'Клуб', 'Труппа', 'Круг', 'Команда'] },
+  hi: { business: ['कार्यशाला', 'स्टूडियो', 'भवन', 'समूह', 'एजेंसी'], innovation: ['प्रयोगशाला', 'नेटवर्क', 'प्रणाली', 'केंद्र', 'परियोजना'], fantasy: ['संघ', 'कुल', 'गिल्ड', 'मंडल', 'सेना'], other: ['समूह', 'क्लब', 'मंडली', 'मंडल', 'दल'] },
+  nl: { business: ['Atelier', 'Studio', 'Huis', 'Collectief', 'Bureau'], innovation: ['Lab', 'Netwerk', 'Systeem', 'Kern', 'Project'], fantasy: ['Orde', 'Clan', 'Gilde', 'Kring', 'Legioen'], other: ['Collectief', 'Club', 'Gezelschap', 'Kring', 'Team'] },
+  pl: { business: ['Pracownia', 'Studio', 'Dom', 'Kolektyw', 'Agencja'], innovation: ['Laboratorium', 'Sieć', 'System', 'Rdzeń', 'Projekt'], fantasy: ['Zakon', 'Klan', 'Gildia', 'Krąg', 'Legion'], other: ['Kolektyw', 'Klub', 'Trupa', 'Krąg', 'Zespół'] },
+  sv: { business: ['Ateljé', 'Studio', 'Hus', 'Kollektiv', 'Byrå'], innovation: ['Labb', 'Nätverk', 'System', 'Kärna', 'Projekt'], fantasy: ['Orden', 'Klan', 'Gille', 'Krets', 'Legion'], other: ['Kollektiv', 'Klubb', 'Trupp', 'Krets', 'Lag'] },
+  vi: { business: ['Xưởng', 'Studio', 'Gia', 'Tập thể', 'Hãng'], innovation: ['Phòng thí nghiệm', 'Mạng lưới', 'Hệ thống', 'Lõi', 'Dự án'], fantasy: ['Hội', 'Gia tộc', 'Bang hội', 'Vòng', 'Quân đoàn'], other: ['Tập thể', 'Câu lạc bộ', 'Đoàn', 'Vòng', 'Đội'] },
+  id: { business: ['Bengkel', 'Studio', 'Rumah', 'Kolektif', 'Agensi'], innovation: ['Lab', 'Jaringan', 'Sistem', 'Inti', 'Proyek'], fantasy: ['Ordo', 'Klan', 'Guild', 'Lingkaran', 'Legiun'], other: ['Kolektif', 'Klub', 'Rombongan', 'Lingkaran', 'Tim'] },
+  th: { business: ['โรงงาน', 'สตูดิโอ', 'บ้าน', 'กลุ่ม', 'เอเจนซี'], innovation: ['แล็บ', 'เครือข่าย', 'ระบบ', 'แกนกลาง', 'โปรเจกต์'], fantasy: ['ภาคี', 'ตระกูล', 'กิลด์', 'วงกลม', 'กองทัพ'], other: ['กลุ่ม', 'ชมรม', 'คณะ', 'วง', 'ทีม'] },
+  el: { business: ['Εργαστήρι', 'Στούντιο', 'Οίκος', 'Συλλογικότητα', 'Πρακτορείο'], innovation: ['Εργαστήριο', 'Δίκτυο', 'Σύστημα', 'Πυρήνας', 'Έργο'], fantasy: ['Τάγμα', 'Φυλή', 'Συντεχνία', 'Κύκλος', 'Λεγεώνα'], other: ['Συλλογικότητα', 'Λέσχη', 'Θίασος', 'Κύκλος', 'Ομάδα'] },
+  he: { business: ['סדנה', 'סטודיו', 'בית', 'קולקטיב', 'סוכנות'], innovation: ['מעבדה', 'רשת', 'מערכת', 'ליבה', 'פרויקט'], fantasy: ['מסדר', 'שבט', 'גילדה', 'מעגל', 'לגיון'], other: ['קולקטיב', 'מועדון', 'להקה', 'מעגל', 'צוות'] },
+  cs: { business: ['Ateliér', 'Studio', 'Dům', 'Kolektiv', 'Agentura'], innovation: ['Laboratoř', 'Síť', 'Systém', 'Jádro', 'Projekt'], fantasy: ['Řád', 'Klan', 'Cech', 'Kruh', 'Legie'], other: ['Kolektiv', 'Klub', 'Soubor', 'Kruh', 'Tým'] },
+  ro: { business: ['Atelier', 'Studio', 'Casa', 'Colectiv', 'Agenția'], innovation: ['Laborator', 'Rețea', 'Sistem', 'Nucleu', 'Proiect'], fantasy: ['Ordinul', 'Clanul', 'Breasla', 'Cercul', 'Legiunea'], other: ['Colectiv', 'Club', 'Trupă', 'Cerc', 'Echipa'] },
+  da: { business: ['Atelier', 'Studio', 'Hus', 'Kollektiv', 'Bureau'], innovation: ['Lab', 'Netværk', 'System', 'Kerne', 'Projekt'], fantasy: ['Orden', 'Klan', 'Lav', 'Kreds', 'Legion'], other: ['Kollektiv', 'Klub', 'Trup', 'Kreds', 'Hold'] },
+  fi: { business: ['Paja', 'Studio', 'Talo', 'Kollektiivi', 'Toimisto'], innovation: ['Laboratorio', 'Verkosto', 'Järjestelmä', 'Ydin', 'Hanke'], fantasy: ['Veljeskunta', 'Klaani', 'Kilta', 'Piiri', 'Legioona'], other: ['Kollektiivi', 'Kerho', 'Seurue', 'Piiri', 'Tiimi'] },
+  uk: { business: ['Майстерня', 'Студія', 'Дім', 'Колектив', 'Агенція'], innovation: ['Лабораторія', 'Мережа', 'Система', 'Ядро', 'Проєкт'], fantasy: ['Орден', 'Клан', 'Гільдія', 'Коло', 'Легіон'], other: ['Колектив', 'Клуб', 'Трупа', 'Коло', 'Команда'] },
+  bn: { business: ['কারখানা', 'স্টুডিও', 'ভবন', 'সমষ্টি', 'এজেন্সি'], innovation: ['পরীক্ষাগার', 'নেটওয়ার্ক', 'ব্যবস্থা', 'কেন্দ্র', 'প্রকল্প'], fantasy: ['সংঘ', 'গোত্র', 'গিল্ড', 'বৃত্ত', 'বাহিনী'], other: ['সমষ্টি', 'ক্লাব', 'দল', 'বৃত্ত', 'টিম'] },
+  nb: { business: ['Atelier', 'Studio', 'Hus', 'Kollektiv', 'Byrå'], innovation: ['Lab', 'Nettverk', 'System', 'Kjerne', 'Prosjekt'], fantasy: ['Orden', 'Klan', 'Gilde', 'Krets', 'Legion'], other: ['Kollektiv', 'Klubb', 'Trupp', 'Krets', 'Lag'] },
+};
+
+/**
+ * Random source used by the whole engine. It is Math.random by default and is swapped for a seeded
+ * generator (mulberry32) while generateNames runs with an explicit `seed`, which makes a batch reproducible.
+ */
+let activeRandom: () => number = Math.random;
+let deterministicMode = false;
+
+function hashSeed(seed: string | number): number {
+  const text = String(seed);
+  let h = 1779033703 ^ text.length;
+  for (let i = 0; i < text.length; i++) {
+    h = Math.imul(h ^ text.charCodeAt(i), 3432918353);
+    h = (h << 13) | (h >>> 19);
+  }
+  return (h ^ (h >>> 16)) >>> 0;
+}
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export interface GenerateOptions {
+  generator?: GeneratorId;
+  generatorId?: GeneratorId;
+  style?: string;
+  length?: LengthOption;
+  format?: FormatOption;
+  gender?: GenderOption;
+  genLanguage?: GenLanguageCode;
+  quantity?: number;
+  count?: number;
+  keyword?: string;
+  /** Optional seed: the same seed and options always produce the same batch (recent-name history is ignored). */
+  seed?: string | number;
+}
+
+/** Public entry point: runs the engine, deterministically when a seed is provided. */
+export function generateNames(options: GenerateOptions): GeneratedName[] {
+  if (options.seed === undefined || options.seed === null || options.seed === '') {
+    return generateNamesInternal(options);
+  }
+  const previousRandom = activeRandom;
+  const previousMode = deterministicMode;
+  activeRandom = mulberry32(hashSeed(options.seed));
+  deterministicMode = true;
+  try {
+    return generateNamesInternal(options);
+  } finally {
+    activeRandom = previousRandom;
+    deterministicMode = previousMode;
+  }
+}
+
+function generateNamesInternal(options: GenerateOptions): GeneratedName[] {
+  const targetGenerator = options.generator || options.generatorId || 'fantasy';
+  const targetStyle = options.style || 'default';
+  const quantity = Math.max(1, options.quantity ?? options.count ?? 9);
+  const {
+    length = 'medium',
+    format = 'title',
+    gender = 'any',
+    genLanguage = 'auto',
+    keyword = '',
+  } = options;
+
+  const baseResolved = resolveStyleData(targetGenerator, targetStyle, SUBCATEGORIES_DATA);
+  const resolved =
+    targetGenerator !== 'baby_name' && genLanguage !== 'fr' && genLanguage !== 'auto'
+      ? resolveEnglishDomainPool(targetGenerator, targetStyle, baseResolved)
+      : baseResolved;
+  const meta = GENERATORS_METADATA[targetGenerator];
+  const categoryFamily = meta?.category || 'creative';
+  const linguisticPolicy = getFamilyLinguisticPolicy(categoryFamily, targetGenerator, genLanguage);
+  const compatibility = getCategoryLanguageCompatibility(targetGenerator, genLanguage);
+  const isFantasyOrLore = categoryFamily === 'fantasy';
+
+  const out: GeneratedName[] = [];
+  const seenInBatch: string[] = [];
+  const recentNames = getRecentNames();
+  const cleanKw = keyword.trim().replace(/[^\p{L}\p{M}\p{N}-]/gu, '');
+
+  // =========================================================================
+  // SPECIALIZED PIPELINE: REAL ATTESTED BABY NAMES (Priorité Absolue Qualité)
+  // =========================================================================
+  if (targetGenerator === 'baby_name') {
+    const localizedSource = genLanguage !== 'auto' ? LOCALIZED_BABY_NAMES[genLanguage] : undefined;
+    const scriptProfile = genLanguage !== 'auto' ? getLanguageScriptProfile(genLanguage) : undefined;
+    const requiresNativeScriptBank = Boolean(
+      scriptProfile?.scripts.some((script) => script !== 'Latin')
+    );
+
+    // A non-Latin locale must never inherit French/Latin attested names from a
+    // generic subcategory or the global fallback. Until a reviewed native-script
+    // bank exists, return no results rather than misrepresenting names as local.
+    if (requiresNativeScriptBank && (!localizedSource || localizedSource.length === 0)) {
+      return [];
+    }
+
+    const nativeScriptSource = requiresNativeScriptBank
+      ? localizedSource!.filter((item) => {
+          const observed = getScriptsInText(item.name);
+          return observed.length > 0 && observed.every((script) => scriptProfile!.scripts.includes(script));
+        })
+      : undefined;
+    if (requiresNativeScriptBank && (!nativeScriptSource || nativeScriptSource.length === 0)) {
+      return [];
+    }
+
+    const attestedSource = requiresNativeScriptBank
+      ? nativeScriptSource!
+      : localizedSource && localizedSource.length > 0
+        ? localizedSource
+        : resolved.attestedItems && resolved.attestedItems.length > 0
+          ? resolved.attestedItems
+          : ATTESTED_BABY_NAMES;
+
+    // Apply semantic filters first. Never silently ignore gender or a user keyword:
+    // an empty result is more honest than returning unrelated names.
+    const semanticPool = attestedSource.filter((item) => {
+      if (gender === 'female' && item.gender === 'male') return false;
+      if (gender === 'male' && item.gender === 'female') return false;
+      if (gender === 'neutral' && item.gender !== 'neutral') return false;
+
+      if (cleanKw) {
+        const kwLower = cleanKw.normalize('NFC').toLocaleLowerCase();
+        const matchesName = item.name.normalize('NFC').toLocaleLowerCase().includes(kwLower);
+        const matchesOrigin = item.origin.normalize('NFC').toLocaleLowerCase().includes(kwLower);
+        const matchesMeaning = item.meaning.normalize('NFC').toLocaleLowerCase().includes(kwLower);
+        if (!matchesName && !matchesOrigin && !matchesMeaning) return false;
+      }
+      return true;
+    });
+
+    // Keep the length preference when possible, but relax it alone if it would
+    // leave no choices. Gender and keyword constraints are never relaxed.
+    let pool = semanticPool.filter((item) => {
+      if (length === 'short' && item.name.length > 5) return false;
+      if (length === 'long' && item.name.length < 7) return false;
+      return true;
+    });
+    if (pool.length === 0) pool = semanticPool;
+    if (pool.length === 0) return [];
+
+    // Unbiased Fisher–Yates shuffle; Array.sort(Math.random) is not a valid shuffle.
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(activeRandom() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    for (const item of shuffled) {
+      if (out.length >= quantity) break;
+      if (seenInBatch.includes(item.name.toLowerCase())) continue;
+      if (recentNames.some((r) => r.toLowerCase() === item.name.toLowerCase())) continue;
+
+      seenInBatch.push(item.name.toLowerCase());
+      out.push({
+        name: item.name,
+        description: `🌸 Prénom répertorié — origine : ${item.origin}. Sens ou interprétation : « ${item.meaning} ».${item.variants && item.variants.length > 0 ? ` Variantes et translittérations : ${item.variants.join(', ')}.` : ''}`,
+        style: resolved.label || targetStyle,
+        icon: '👶',
+        bestFor: resolved.bestFor || 'futurs enfants, fratries et faire-part',
+        tone: resolved.tone || 'Harmonieux • intemporel • doux',
+        generatorId: 'baby_name',
+        pronunciation: generatePronunciation(item.name),
+        strengths: [
+          'Prénom issu du répertoire documenté de NameForge',
+          `Origine indiquée dans le répertoire : ${item.origin}`,
+          'Élocution quotidienne fluide et douce',
+        ],
+        watchouts: ['Prononcez-le avec votre nom de famille pour vérifier l’accord phonétique'],
+        origin: `Origine certifiée : ${item.origin}`,
+        meaning: item.meaning,
+        isAttested: true,
+        variants: item.variants,
+        gender: item.gender,
+      });
+    }
+
+    // Second pass if quantity not yet reached without duplicates
+    if (out.length < quantity) {
+      for (const item of shuffled) {
+        if (out.length >= quantity) break;
+        if (seenInBatch.includes(item.name.toLowerCase())) continue;
+        seenInBatch.push(item.name.toLowerCase());
+        out.push({
+          name: item.name,
+          description: `🌸 Prénom répertorié — origine : ${item.origin}. Sens ou interprétation : « ${item.meaning} ».`,
+          style: resolved.label || targetStyle,
+          icon: '👶',
+          bestFor: resolved.bestFor || 'futurs enfants, fratries et faire-part',
+          tone: resolved.tone || 'Harmonieux • intemporel • doux',
+          generatorId: 'baby_name',
+          pronunciation: generatePronunciation(item.name),
+          strengths: ['Prénom issu du répertoire NameForge', `Origine indiquée : ${item.origin}`],
+          watchouts: ['Prononcez avec le nom de famille'],
+          origin: `Origine certifiée : ${item.origin}`,
+          meaning: item.meaning,
+          isAttested: true,
+          variants: item.variants,
+          gender: item.gender,
+        });
+      }
+    }
+
+    if (out.length > 0) {
+      recordRecentNames(out.map((x) => x.name));
+      addGenerationHistory(out);
+      return out;
+    }
+
+    // Never fall through to invented-name strategies for the baby-name category.
+    // If every matching attested name is in recent history, return an honest empty
+    // result rather than presenting a procedural invention as a real given name.
+    return [];
+  }
+
+  // =========================================================================
+  // CURATED PHRASES IN THE CHOSEN LANGUAGE (slogans, book titles, song titles)
+  // =========================================================================
+  const phraseBank = genLanguage !== 'auto' ? getPhraseBank(targetGenerator, genLanguage) : [];
+  if (phraseBank.length > 0) {
+    const kwLower = cleanKw.normalize('NFC').toLocaleLowerCase();
+    const matching = cleanKw
+      ? phraseBank.filter((p) => p.normalize('NFC').toLocaleLowerCase().includes(kwLower))
+      : phraseBank;
+    // A keyword that matches no curated phrase falls through to the procedural pipeline below.
+    if (matching.length > 0) {
+      const fresh = matching.filter((p) => !recentNames.some((r) =>
+        r.normalize('NFC').toLocaleLowerCase() === p.normalize('NFC').toLocaleLowerCase()
+      ));
+      const shuffle = (list: string[]): string[] => {
+        const copy = [...list];
+        for (let i = copy.length - 1; i > 0; i--) {
+          const j = Math.floor(activeRandom() * (i + 1));
+          [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+      };
+      // Never recycle a recently shown curated phrase just to fill the requested quantity.
+      // A smaller honest batch is preferable to artificial repetition.
+      const pool = shuffle(fresh);
+      for (const phrase of pool.slice(0, quantity)) {
+        const phraseMeta = buildProfessionalMetadata(phrase, targetGenerator, resolved.label || targetStyle, length, genLanguage);
+        out.push({
+          name: phrase,
+          description: (randomItem(resolved.descriptions) as string) || '',
+          style: resolved.label || targetStyle,
+          icon: resolved.icon || '✨',
+          bestFor: resolved.bestFor || '',
+          tone: resolved.tone || '',
+          generatorId: targetGenerator,
+          strengths: phraseMeta.strengths,
+          watchouts: phraseMeta.watchouts,
+          disclaimer: phraseMeta.disclaimer,
+          origin: phraseMeta.origin,
+        });
+      }
+      recordRecentNames(out.map((x) => x.name));
+      addGenerationHistory(out);
+      return out;
+    }
+  }
+
+  // =========================================================================
+  // STANDARD PROCEDURAL & LINGUISTIC PIPELINE
+  // =========================================================================
+  // Family policy controls construction strategies, titles, gender morphology and token handling.
+  const strategies: GenerationStrategy[] = linguisticPolicy.strategies;
+  const explicitLanguageRules = genLanguage !== 'auto' ? LANGUAGE_PHONETICS[genLanguage] : undefined;
+  const isJapaneseAnimeCategory = JAPANESE_ANIME_GENERATORS.has(targetGenerator);
+  // Keep the selected generator's thematic vocabulary for Latin locales and culturally
+  // anchored categories (e.g. Japanese Anime family).
+  // Arabic and anime/Japanese use phonetic rendering of those same category roots.
+  // Generic language roots remain a fallback for other non-Latin procedural categories.
+  const usesLanguageRoots = Boolean(
+    !compatibility.preserveCulturalIdentity &&
+    explicitLanguageRules && explicitLanguageRules.prefixes.length > 0 &&
+    !getLanguageScriptProfile(genLanguage).scripts.includes('Latin') &&
+    genLanguage !== 'ar' && !(genLanguage === 'ja' && isJapaneseAnimeCategory)
+  );
+  const keywordScriptsMatch = !cleanKw || genLanguage === 'auto' ||
+    (isKeywordCompatibleWithLanguage(cleanKw, genLanguage) &&
+      getScriptsInText(cleanKw).every((script) => getLanguageScriptProfile(genLanguage).scripts.includes(script)));
+  const vocabulary = usesLanguageRoots
+    ? [...explicitLanguageRules!.prefixes, ...explicitLanguageRules!.suffixes]
+    : [...resolved.prefixes, ...resolved.suffixes];
+  const wholeWordCount = vocabulary.filter(
+    (w) => w.includes(' ') || (/^\p{Lu}/u.test(w) && Array.from(w).length >= 5)
+  ).length;
+  const averageVocabularyLength =
+    vocabulary.reduce((sum, w) => sum + Array.from(w).length, 0) / Math.max(1, vocabulary.length);
+  // Non-Latin scripts and scripts with combining marks (Bengali, Hindi, Thai, Cyrillic, Arabic, Hebrew, CJK…) cannot be
+  // cut at arbitrary positions without breaking grapheme clusters, so their roots are always kept whole.
+  const hasComplexScript = vocabulary.some((w) => /[\p{M}\p{Lo}]|[^\u0000-\u024F\u1E00-\u1EFF]/u.test(w));
+  const isWholeWordVocabulary =
+    vocabulary.length > 0 &&
+    (linguisticPolicy.preferWholeWords || hasComplexScript || wholeWordCount / vocabulary.length >= 0.5 || averageVocabularyLength >= 4.4);
+
+  let candidatePool: ScoredCandidate[] = [];
+  let attempts = 0;
+  const maxAttempts = quantity * 150;
+
+  while (candidatePool.length < quantity * 4 && attempts < maxAttempts) {
+    attempts++;
+    let strategy = strategies[attempts % strategies.length];
+    if (
+      isWholeWordVocabulary &&
+      (strategy === 'neologism' || strategy === 'portmanteau_blend' || strategy === 'punchy_minimal')
+    ) {
+      strategy = 'phonetic_harmony';
+    }
+    let baseName = '';
+
+    if (cleanKw) {
+      const kwCap = cleanKw.charAt(0).toUpperCase() + cleanKw.slice(1);
+      // Latin transliterations are accepted as input but are never mixed with native-script affixes.
+      if (!keywordScriptsMatch) {
+        baseName = kwCap;
+      } else {
+      const mode = activeRandom();
+      const keywordPrefixes = usesLanguageRoots ? explicitLanguageRules!.prefixes : resolved.prefixes;
+      const keywordSuffixes = usesLanguageRoots ? explicitLanguageRules!.suffixes : resolved.suffixes;
+      const allowPersonalTitle =
+        linguisticPolicy.allowLocalizedTitles &&
+        !isFrenchPhrase(kwCap, genLanguage);
+      const keywordTitles = allowPersonalTitle ? LANGUAGE_PHONETICS[genLanguage]?.titleWords || [] : (genLanguage === 'auto' ? resolved.titles : []);
+      const suf = randomItem(keywordSuffixes) || '';
+      const pref = randomItem(keywordPrefixes) || '';
+      const titleW = randomItem(keywordTitles || []) || '';
+
+      if (mode < 0.35 && suf) {
+        baseName = combineParts(kwCap, suf, genLanguage);
+      } else if (mode < 0.65 && pref) {
+        baseName = combineParts(pref, kwCap, genLanguage);
+      } else if (titleW && !kwCap.includes(' ') && activeRandom() < 0.5) {
+        baseName = combineParts(kwCap, titleW, genLanguage);
+      } else {
+        baseName = `${kwCap} ${suf || ''}`.trim();
+      }
+      }
+    } else {
+      const isPhrasal =
+        !usesLanguageRoots &&
+        (resolved.prefixes.some((p) => p.includes(' ') || p.length > 8) ||
+        resolved.suffixes.some((s) => s.includes(' ') || s.length > 8));
+
+      if (isPhrasal) {
+        // Phrasal categories must preserve whole words without mutilating syllables
+        const p = (randomItem(resolved.prefixes) as string) || 'Le';
+        const s = (randomItem(resolved.suffixes) as string) || 'Monde';
+        baseName = combineParts(p, s, genLanguage);
+      } else {
+        switch (strategy) {
+          case 'phonetic_harmony':
+            baseName = generatePhoneticHarmony(resolved, length, genLanguage, usesLanguageRoots);
+            break;
+          case 'neologism':
+            baseName = generateNeologism(resolved, length, genLanguage, usesLanguageRoots);
+            break;
+          case 'portmanteau_blend':
+            baseName = generatePortmanteauBlend(resolved, genLanguage, usesLanguageRoots);
+            break;
+          case 'symbolic_evocative':
+            baseName = generateSymbolicEvocative(targetGenerator, resolved, genLanguage, usesLanguageRoots);
+            break;
+          case 'punchy_minimal':
+            baseName = generatePunchyMinimal(resolved, genLanguage, usesLanguageRoots);
+            break;
+          case 'epic_compound': {
+            const part1 = generatePhoneticHarmony(resolved, 'short', genLanguage, usesLanguageRoots);
+            const part2 = generatePhoneticHarmony(resolved, 'short', genLanguage, usesLanguageRoots);
+            if (part1.includes(' ') || part2.includes(' ')) {
+              baseName = part1;
+            } else {
+              baseName = combineParts(part1, part2, genLanguage);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    if (!baseName || baseName.length < 2) continue;
+
+    // Apply Format
+    let formattedName = baseName;
+    if (format === 'full' && keywordScriptsMatch) {
+      const surname = generatePhoneticHarmony(resolved, 'medium', genLanguage, usesLanguageRoots);
+      if (surname.toLowerCase() !== baseName.toLowerCase()) {
+        formattedName = combineParts(baseName, surname, genLanguage);
+      }
+    } else if (format === 'group' && keywordScriptsMatch) {
+      const keepLatinGroup =
+        compatibility.preserveCulturalIdentity &&
+        !usesLanguageRoots &&
+        genLanguage !== 'ar' &&
+        genLanguage !== 'ja';
+      const localizedGroups = !keepLatinGroup && genLanguage !== 'auto' ? GROUP_WORDS[genLanguage] : undefined;
+      const defaultGroups = localizedGroups
+        ? categoryFamily === 'business'
+          ? localizedGroups.business
+          : categoryFamily === 'innovation'
+          ? localizedGroups.innovation
+          : categoryFamily === 'fantasy'
+          ? localizedGroups.fantasy
+          : localizedGroups.other
+        : categoryFamily === 'business'
+          ? ['Atelier', 'Studio', 'Maison', 'Collectif', 'Groupe', 'Agence', 'Boutique']
+          : categoryFamily === 'innovation'
+          ? ['Lab', 'Engine', 'System', 'Network', 'Core', 'Project', 'Platform']
+          : categoryFamily === 'fantasy'
+          ? ['Ordre', 'Clan', 'Guilde', 'Cercle', 'Légion', 'Maison']
+          : ['Collectif', 'Studio', 'Club', 'Troupe', 'Cercle', 'Équipe'];
+
+      const groupPool = localizedGroups
+        ? defaultGroups
+        : (genLanguage === 'auto' || keepLatinGroup)
+          ? (resolved.groupTypes || defaultGroups)
+          : [];
+      const g = (randomItem(groupPool) as string) || '';
+      formattedName = g ? `${g} ${baseName}` : baseName;
+    } else if (format === 'compound' && keywordScriptsMatch) {
+      if (!baseName.includes(' ')) {
+        const secondary = generatePunchyMinimal(resolved, genLanguage, usesLanguageRoots);
+        formattedName = combineParts(baseName, secondary, genLanguage);
+      }
+    } else if (format === 'minimal') {
+      // Minimal format stays compact without appending extra title phrases.
+      formattedName = baseName;
+    } else if (keywordScriptsMatch) {
+      // Prefer titles written for the selected language. Culturally faithful categories
+      // (such as Anime) avoid hybridizing romaji names with unrelated French/English titles
+      // when an explicit generation language is chosen.
+      const langRules = LANGUAGE_PHONETICS[genLanguage] || LANGUAGE_PHONETICS.auto;
+      const suppressForeignTitles =
+        (compatibility.preserveCulturalIdentity && genLanguage !== 'auto') ||
+        baseName.includes(' ') ||
+        isFrenchPhrase(baseName, genLanguage);
+      const localizedTitles =
+        !suppressForeignTitles &&
+        linguisticPolicy.allowLocalizedTitles &&
+        genLanguage !== 'auto' &&
+        genLanguage !== 'ar' &&
+        !(genLanguage === 'ja' && isJapaneseAnimeCategory)
+          ? langRules.titleWords
+          : [];
+      const categoryTitles =
+        genLanguage === 'auto' && !suppressForeignTitles && !baseName.includes(' ')
+          ? (resolved.titles || [])
+          : [];
+      const titlesPool = localizedTitles.length > 0 ? localizedTitles : categoryTitles;
+
+      if (titlesPool.length > 0 && activeRandom() < 0.28) {
+        const title = (randomItem(titlesPool) as string) || '';
+        if (title) {
+          formattedName = combineParts(baseName, title, genLanguage);
+        }
+      } else if (
+        isFantasyOrLore &&
+        linguisticPolicy.allowLocalizedTitles &&
+        !suppressForeignTitles &&
+        !baseName.includes(' ') &&
+        activeRandom() < 0.22
+      ) {
+        const fallbackTitles = genLanguage === 'auto'
+          ? ['le Brave', 'l’Ancien', 'le Juste', 'le Gardien']
+          : localizedTitles;
+        const title = (randomItem(fallbackTitles) as string) || '';
+        if (title) formattedName = combineParts(baseName, title, genLanguage);
+      }
+    }
+
+    // Latin-script gender suffix rules must not append Latin letters to CJK, Arabic,
+    // Cyrillic, Devanagari, Thai, Greek, or Hebrew names, or mangle Japanese romaji stems.
+    const usesNonLatinGenderRules = !linguisticPolicy.allowGenderMorphology;
+    // Gender adaptations
+    if (!usesNonLatinGenderRules && gender === 'female' && !formattedName.includes(' ')) {
+      if (resolved.femaleStarts && resolved.femaleStarts.length > 0 && activeRandom() < 0.4) {
+        const fPrefix = randomItem(resolved.femaleStarts);
+        if (fPrefix) {
+          formattedName = combineParts(fPrefix, formattedName.toLowerCase(), genLanguage);
+        }
+      } else if (!isJapaneseAnimeCategory) {
+        if (/(?:or|us|os|ik|ak)$/i.test(formattedName)) {
+          const feminized = formattedName.replace(/(?:or|us|os|ik|ak)$/i, 'a');
+          // Never let the gender rule reduce a name to a 2-3 letter stub.
+          if (feminized.length >= 4) formattedName = feminized;
+        } else if (!/[aeiouy]$/i.test(formattedName)) {
+          formattedName = formattedName + 'a';
+        }
+      }
+    } else if (!usesNonLatinGenderRules && gender === 'male' && !formattedName.includes(' ')) {
+      if (resolved.maleStarts && resolved.maleStarts.length > 0 && activeRandom() < 0.4) {
+        const mPrefix = randomItem(resolved.maleStarts);
+        if (mPrefix) {
+          formattedName = combineParts(mPrefix, formattedName.toLowerCase(), genLanguage);
+        }
+      } else if (!isJapaneseAnimeCategory && /a$/i.test(formattedName) && formattedName.length > 4) {
+        formattedName = formattedName.slice(0, -1) + 'an';
+      }
+    }
+
+    // Keep category roots intact while rendering them in the selected script.
+    if (keywordScriptsMatch && genLanguage === 'ar') {
+      formattedName = transliterateLatinToArabic(formattedName);
+    } else if (keywordScriptsMatch && genLanguage === 'ja' && isJapaneseAnimeCategory) {
+      formattedName = transliterateAnimeToKatakana(formattedName);
+    }
+
+    if (!formattedName || formattedName.length < 2) continue;
+
+    const score = scoreCandidate(formattedName, length, gender, Boolean(cleanKw));
+    if (score >= 65) {
+      candidatePool.push({ name: formattedName, score, strategy });
+    }
+  }
+
+  // Keep linguistic score primary while using diversity as a tie-breaker within a 2.5-point band.
+  candidatePool = selectDiverseCandidates(candidatePool, quantity * 4);
+
+  // Diverse Selection Phase (incorporating Levenshtein anti-similarity filter)
+  const usedStrategies = new Set<GenerationStrategy>();
+
+  for (const cand of candidatePool) {
+    if (out.length >= quantity) break;
+
+    // When keyword is requested, only accept candidates containing the keyword
+    if (cleanKw && !cand.name.toLowerCase().includes(cleanKw.toLowerCase())) {
+      continue;
+    }
+
+    // Check exact & similarity collision with current batch (keyword-aware)
+    if (isTooSimilar(cand.name, seenInBatch, cleanKw)) {
+      continue;
+    }
+
+    // Check recent history collision if possible
+    if (recentNames.some((r) => r.toLowerCase() === cand.name.toLowerCase())) {
+      continue;
+    }
+
+    seenInBatch.push(cand.name);
+    usedStrategies.add(cand.strategy);
+
+    const desc = (randomItem(resolved.descriptions) as string) ||
+      '✨ Un nom exclusif façonné avec soin par la forge NameForge.';
+
+    const meta = buildProfessionalMetadata(cand.name, targetGenerator, resolved.label || targetStyle, length, genLanguage);
+
+    out.push({
+      name: cand.name,
+      description: desc,
+      style: resolved.label || targetStyle,
+      icon: resolved.icon || '✨',
+      bestFor: resolved.bestFor || 'projets créatifs et professionnels',
+      tone: resolved.tone || 'Distinctif • mémorable • percutant',
+      generatorId: targetGenerator,
+      pronunciation: generatePronunciation(cand.name),
+      strengths: meta.strengths,
+      watchouts: meta.watchouts,
+      disclaimer: meta.disclaimer,
+      origin: meta.origin,
+      isAttested: targetGenerator === 'baby_name' ? true : undefined,
+    });
+  }
+
+  // Graceful fallback to guarantee exactly the requested quantity
+  if (out.length < quantity) {
+    for (const cand of candidatePool) {
+      if (out.length >= quantity) break;
+      if (cleanKw && !cand.name.toLowerCase().includes(cleanKw.toLowerCase())) continue;
+      if (seenInBatch.some((s) => s.toLowerCase() === cand.name.toLowerCase())) continue;
+
+      seenInBatch.push(cand.name);
+      const desc =
+        (randomItem(resolved.descriptions) as string) ||
+        '✨ Un nom exclusif façonné avec soin par la forge NameForge.';
+      const meta = buildProfessionalMetadata(cand.name, targetGenerator, resolved.label || targetStyle, length, genLanguage);
+
+      out.push({
+        name: cand.name,
+        description: desc,
+        style: resolved.label || targetStyle,
+        icon: resolved.icon || '✨',
+        bestFor: resolved.bestFor || 'projets créatifs et professionnels',
+        tone: resolved.tone || 'Distinctif • mémorable • percutant',
+        generatorId: targetGenerator,
+        pronunciation: generatePronunciation(cand.name),
+        strengths: meta.strengths,
+        watchouts: meta.watchouts,
+        disclaimer: meta.disclaimer,
+        origin: meta.origin,
+      });
+    }
+  }
+
+  // Final synthetic pass if candidate pool was exhausted (respecting target script & transliteration rules)
+  let fallbackIndex = 0;
+  while (out.length < quantity && fallbackIndex < 120) {
+    fallbackIndex++;
+    const kwCap = cleanKw ? cleanKw.charAt(0).toUpperCase() + cleanKw.slice(1) : '';
+    let syntheticName: string;
+    if (kwCap) {
+      const suffixesPool = ['Tech', 'Core', 'Labs', 'Prime', 'Craft', 'Solutions', 'Studio', 'Nova', 'Pro'];
+      const suffixList = usesLanguageRoots && explicitLanguageRules!.suffixes.length ? explicitLanguageRules!.suffixes : resolved.suffixes;
+      const altSuffix = randomItem(suffixList) || randomItem(suffixesPool) || 'One';
+      syntheticName = keywordScriptsMatch ? `${kwCap} ${altSuffix}` : kwCap;
+    } else {
+      const prefixList = usesLanguageRoots && explicitLanguageRules!.prefixes.length ? explicitLanguageRules!.prefixes : resolved.prefixes;
+      const suffixList = usesLanguageRoots && explicitLanguageRules!.suffixes.length ? explicitLanguageRules!.suffixes : resolved.suffixes;
+      const p = randomItem(prefixList) || 'Nova';
+      const s = randomItem(suffixList) || 'is';
+      syntheticName = combineParts(p, s, genLanguage);
+    }
+
+    if (keywordScriptsMatch && genLanguage === 'ar') {
+      syntheticName = transliterateLatinToArabic(syntheticName);
+    } else if (keywordScriptsMatch && genLanguage === 'ja' && isJapaneseAnimeCategory) {
+      syntheticName = transliterateAnimeToKatakana(syntheticName);
+    }
+
+    if (!syntheticName || syntheticName.length < 2) continue;
+    if (!cleanKw && hasIncoherentMixedScript(syntheticName)) continue;
+
+    if (!seenInBatch.some((item) => item.toLowerCase() === syntheticName.toLowerCase())) {
+      seenInBatch.push(syntheticName);
+      const desc =
+        (randomItem(resolved.descriptions) as string) ||
+        '✨ Un nom exclusif façonné avec soin par la forge NameForge.';
+      const meta = buildProfessionalMetadata(syntheticName, targetGenerator, resolved.label || targetStyle, length, genLanguage);
+
+      out.push({
+        name: syntheticName,
+        description: desc,
+        style: resolved.label || targetStyle,
+        icon: resolved.icon || '✨',
+        bestFor: resolved.bestFor || 'projets créatifs et professionnels',
+        tone: resolved.tone || 'Distinctif • mémorable • percutant',
+        generatorId: targetGenerator,
+        pronunciation: generatePronunciation(syntheticName),
+        strengths: meta.strengths,
+        watchouts: meta.watchouts,
+        disclaimer: meta.disclaimer,
+        origin: meta.origin,
+      });
+    }
+  }
+
+  // Update sliding window of recent names
+  if (out.length > 0) {
+    recordRecentNames(out.map((x) => x.name));
+    addGenerationHistory(out);
+  }
+
+  return out;
+}
