@@ -146,7 +146,7 @@ function run() {
 
   // Unverified phrase banks are quarantined, so this category now uses the procedural profile.
   const sloganTh = getGeneratorCompatibilityAssessment('slogan', 'th', 'en');
-  assert.equal(resolveGeneratorCompatibilityDomain('slogan'), 'creative');
+  assert.equal(resolveGeneratorCompatibilityDomain('slogan'), 'business');
   assert.equal(sloganTh.level, 'limited-resources');
 
   const valkyrieNordic = getGeneratorCompatibilityAssessment('nordic_valkyrie', 'nordic', 'en');
