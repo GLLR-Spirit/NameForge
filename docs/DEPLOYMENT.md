@@ -1,6 +1,6 @@
 # Deployment
 
-Production hosting: https://gllr-spirit.github.io/nameforge/
+Production hosting: https://gllr-spirit.github.io/NameForge/
 
 The deployment workflow is .github/workflows/deploy-pages.yml. It builds and publishes the dist/ directory from the main branch, then runs a Lighthouse audit against the published site.
 
