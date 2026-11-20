@@ -291,3 +291,69 @@ Le précédent tableau décrivait 276 entrées npm. Le contrôle direct du lockf
 7. **Validation finale** : tests de build, tests fonctionnels, revue des attributions, comparaison du diff et vérification du site de préproduction avant toute fusion dans `main`.
 
 Aucune modification du moteur, des données runtime, des images, des licences ou de la branche `main` n'est effectuée par cet ajout documentaire.
+
+
+## 14. État des contenus encore actifs — vérification du 2026-11-20
+
+Cette section complète le registre à partir de l'état réel de `main` au commit de référence `41ba34bb3ebc502ccd1b39ca9462bd98f2b8ad77`. Elle distingue impérativement `main` de la branche de quarantaine de la PR #6.
+
+### 14.1 Banques de phrases : différence entre production actuelle et correctif proposé
+
+- Dans `main`, `src/data/phraseBanks.ts` importe encore `phraseBanksExpansionA.ts` et `phraseBanksExpansionB.ts`. Le moteur utilise ces banques pour les générateurs concernés.
+- La PR #6, branche `security/quarantine-unverified-phrase-banks-2026-11-20`, commit `a09fb5a256219d06d6be520b3b5d86d745a68d84`, remplace le registre runtime par une liste vide et retire les deux extensions du répertoire source actif.
+- Au moment de cette vérification, la PR #6 est ouverte, en brouillon et non fusionnée. Son correctif ne doit donc pas être décrit comme déjà appliqué à `main` ou à la production.
+- La réussite des tests de la branche #6 prouve le comportement testé sur cette branche, pas l'état de la branche principale.
+
+**Décision conservatoire :** les banques restent classées « provenance et droits non établis » dans `main`. Ne pas les présenter comme des contenus dont la titularité ou l'autorisation de redistribution est démontrée. La quarantaine de la PR #6 est une mesure technique de réduction du risque, pas une preuve de propriété ni une décision juridique sur l'origine des phrases.
+
+### 14.2 Inventaire des autres contenus actifs à documenter
+
+| Élément actif ou intégré au produit | Ce que le dépôt permet d'établir | Ce qui manque pour établir la provenance et l'autorisation | Statut |
+|---|---|---|---|
+| `src/data/attestedBabyNames.ts` | Un corpus de prénoms est utilisé comme données présentées comme attestées; le fichier contient des champs de nom et d'informations linguistiques | Source primaire par entrée, référence vérifiable, licence/conditions de la source, méthode de compilation et preuve de vérification des étymologies/significations | **Non validé pour les affirmations étymologiques** |
+| `src/data/englishDomainPools.ts` | Des pools lexicaux anglais sont employés par les générateurs | Liste des sources, auteurs des formulations, distinction entre mots communs, créations éditoriales et emprunts; conditions de réutilisation de toute source externe | **Provenance incomplète** |
+| `src/data/businessAndCreativeCategories.ts` | Catégories, libellés et contenu éditorial sont présents dans le runtime | Auteur/rédacteur, sources de référence, statut des textes originaux ou repris et autorisations éventuelles | **Provenance incomplète** |
+| `src/data/japaneseKatakanaReference.ts` | Références de conversion/écriture en katakana présentes dans le code; le projet indique que les résultats ne sont pas nécessairement des prénoms japonais attestés | Source de chaque paire, version, méthode de translittération et revue linguistique compétente; licence si corpus externe | **Source et validation linguistique à établir** |
+| `src/data/syllableEnrichment.ts` | Données/règles d'enrichissement syllabique présentes dans le projet | Origine des listes, auteur, références linguistiques et conditions de réutilisation | **Provenance incomplète** |
+| Modules `src/i18n/**` (29 modules recensés) | Chaînes d'interface et contenus localisés dans plusieurs langues | Statut par module/segment : rédaction originale, traduction humaine, traduction automatique/assistée, contenu tiers; auteur, langue source, date, outil/service utilisé et conditions applicables | **Méthode et contributions à documenter** |
+| `public/images/*` et `src/assets/images/nameforge-logo-128.png` (7 images recensées) | Fichiers logo, Open Graph et icônes intégrés au site | Fichier source de création, auteur, date, outil, ressources incorporées, licence/achat/autorisation et preuve correspondante | **Droits non établis par le dépôt** |
+| Code applicatif et contributions importées lors de la migration `5272543c19b6986db3675657a077b8a5d0abccef` | Le commit de migration a introduit 255 fichiers et est attribué au compte GitHub du dépôt | Historique de création antérieur, contributions de tiers, accords de contribution/cession si applicables, origine des fichiers importés | **Titularité globale non démontrée par le seul commit de migration** |
+
+Aucun de ces statuts ne signifie qu'une infraction a eu lieu. Ils signifient uniquement que les éléments examinés ne suffisent pas à prouver l'origine et le droit de redistribution.
+
+### 14.3 Registre de preuves à constituer
+
+Pour chaque jeu de données ou bloc éditorial, enregistrer au minimum :
+
+- identifiant stable de l'élément et chemin exact dans le dépôt;
+- auteur/créateur et rôle de chaque contributeur, selon les preuves disponibles;
+- source originale, URL précise et identifiant de l'enregistrement source;
+- version/date d'accès et empreinte du fichier source lorsque disponible;
+- licence exacte ou autorisation écrite, titulaire qui l'accorde et périmètre de l'autorisation;
+- attribution et mentions obligatoires;
+- transformations, traductions, corrections ou génération assistée par IA;
+- outil/service utilisé et conditions applicables à la date de création, si l'IA a été utilisée;
+- statut de validation, personne ayant vérifié et date de vérification.
+
+Pour les images, joindre le fichier de travail/export d'origine, les reçus ou licences d'actifs incorporés et l'autorisation du créateur lorsqu'elle est nécessaire. Pour les traductions, consigner la langue source, la méthode et les contributions humaines. Pour les prénoms attestés, rattacher les références aux enregistrements individuels plutôt qu'à une simple page générale.
+
+### 14.4 Informations qui ne peuvent pas être déduites automatiquement
+
+Les fichiers et métadonnées Git consultés ne permettent pas de déterminer avec certitude :
+- si un texte a été écrit personnellement, fourni par un tiers ou généré/retouché avec un outil d'IA;
+- qui détient les droits sur un logo ou une image;
+- si un traducteur a autorisé la redistribution de ses traductions;
+- si une source de prénoms autorise la redistribution des données dérivées;
+- si les contributeurs ont conclu un accord transférant ou autorisant les droits nécessaires.
+
+Ces éléments doivent être fournis par le propriétaire du projet ou par les contributeurs concernés, avec pièces justificatives lorsque disponibles. En l'absence de preuve, conserver le statut « non vérifié » et ne pas inventer d'auteur, de licence ou d'autorisation.
+
+### 14.5 Actions de validation prioritaires
+
+1. Confirmer l'origine de chaque banque, fichier de traduction, corpus de prénoms, liste lexicale et image.
+2. Rassembler les fichiers sources, prompts/exports ou historiques de création disponibles, sans les considérer comme preuve suffisante à eux seuls.
+3. Obtenir les autorisations écrites nécessaires auprès des auteurs/titulaires ou remplacer les éléments dont les droits restent impossibles à établir.
+4. Ajouter des références par enregistrement pour les données présentées comme attestées.
+5. Refaire l'audit des bundles de production après intégration de la quarantaine de la PR #6.
+6. Ne choisir une licence globale pour NameForge qu'après clarification des droits sur le code, les contenus, les traductions et les médias.
+
