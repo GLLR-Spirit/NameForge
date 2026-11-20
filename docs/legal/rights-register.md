@@ -141,3 +141,50 @@ Aucune banque n'a été supprimée ou modifiée. Aucun générateur n'a été d�
 ## 10. Limites
 
 Cet audit est une revue technique et documentaire du contenu visible du dépôt et de ses métadonnées. Il ne prouve pas l'originalité de chaque phrase, l'identité de chaque auteur, la titularité juridique ni la conformité complète des livrables. Les conclusions définitives et les réponses à une réclamation doivent être validées par un professionnel compétent en propriété intellectuelle dans les juridictions concernées.
+
+
+## 11. Traçage complémentaire des banques de phrases — dépôt historique
+
+Un contrôle complémentaire a été effectué sur le dépôt historique `hhkskkkdjwbf-bot/NFV2`.
+
+### Faits établis
+
+1. Le dépôt historique contient `src/data/phraseBanks.ts`. Le fichier porte un commentaire le décrivant comme des banques de phrases « curated » et explique leur format multilingue. Cette description est une déclaration du code, pas une preuve indépendante de l'auteur ou de la licence.
+2. Le fichier historique `src/data/phraseBanks.ts` a le blob Git SHA `d114d56df07efca6d05d993f75beb270672c8704` dans la version consultée.
+3. Les chemins `src/data/phraseBanksExpansionA.ts` et `src/data/phraseBanksExpansionB.ts` n'ont pas été trouvés dans le dépôt historique interrogé. Cela ne prouve pas qu'ils n'ont jamais existé ailleurs ou sous un autre chemin.
+4. L'historique de l'ancien dépôt expose au moins les commits suivants modifiant le fichier principal :
+   - `e88c8edfe455d6cf15d3525ae923b824a73c8c67` — « Complete English videogame phrase bank ».
+   - `198e19787dfc7a4a577126f8645885a9054acbaa` — « Expand localized videogame phrase banks ».
+   - `46c97ba825fd95f539f17c2a617cd3d46148bf62` — « Expand localized shop name phrase banks ».
+5. Les patches consultés montrent des ajouts/modifications de chaînes dans les banques videogame et shop. Les messages de commit ne documentent pas les sources des formulations, les auteurs réels de chaque phrase, ni une autorisation d'utiliser des corpus externes.
+6. Le dépôt historique interrogé ne contient pas de fichier racine `LICENSE` à l'emplacement vérifié.
+7. Le README historique identifie le projet et l'hébergement GitHub Pages, mais ne constitue pas une licence de réutilisation des banques de phrases.
+
+### Ce que ces éléments ne prouvent pas
+
+- Ils ne prouvent pas que toutes les phrases ont été écrites par le titulaire du compte GitHub.
+- Ils ne prouvent pas que les phrases proviennent de Google AI Studio, d'un autre modèle IA, d'un site tiers ou d'un corpus précis.
+- Ils ne prouvent pas qu'une violation de droits a eu lieu.
+- Ils ne prouvent pas que les phrases sont toutes protégeables par le droit d'auteur : la protection dépend notamment de l'originalité et du droit applicable.
+- Ils ne permettent pas d'attribuer une titularité juridique à une personne sur la seule base des métadonnées Git.
+
+### Conclusion de traçage
+
+La piste historique est partiellement établie pour le fichier principal : il existait dans le dépôt NFV2 et a été enrichi par plusieurs commits identifiables. En revanche, la provenance intellectuelle et les droits de redistribution des formulations restent **non démontrés**. Les extensions A et B ont une provenance encore moins documentée puisqu'elles n'ont pas été retrouvées sous ces chemins dans le dépôt historique.
+
+### Mesures conservatoires recommandées
+
+1. Conserver les trois fichiers et leurs blobs/commits sans réécrire l'historique.
+2. Ne pas ajouter de licence globale qui prétendrait couvrir rétroactivement ces formulations.
+3. Avant toute monétisation ou republication présentée comme corpus propriétaire, décider entre :
+   - obtenir des preuves/permissions et documenter les formulations conservables ;
+   - réécrire les éléments dont l'origine est incertaine avec un processus de création traçable ;
+   - remplacer les données par des sources explicitement licenciées, avec attribution et respect des conditions.
+4. Si le corpus est réécrit, garder un instantané de l'ancien corpus en archive privée de travail pour préserver la traçabilité, sans le redistribuer comme contenu validé.
+
+### Informations encore nécessaires du propriétaire du projet
+
+- Souvenirs, prompts, exports ou historiques Google AI Studio éventuellement conservés.
+- Documents de travail ou fichiers locaux antérieurs à l'ajout des phrases.
+- Identification des personnes ayant rédigé ou fourni les banques.
+- Toute source externe utilisée comme inspiration, référence ou matière première.
