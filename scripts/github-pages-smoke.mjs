@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 
 const baseUrl = process.env.PAGES_BASE_URL || 'https://nameforge-bhk.pages.dev/';
+const canonicalUrl = process.env.CANONICAL_SITE_URL || 'https://nameforge-bhk.pages.dev/';
 const failures = [];
 const checks = [];
 
@@ -9,8 +10,8 @@ if (!response.ok) throw new Error('Published site returned HTTP ' + response.sta
 const html = await response.text();
 if (!/<title>[^<]+<\/title>/i.test(html)) failures.push('Published HTML has no document title');
 if (!/nameforge/i.test(html)) failures.push('Published HTML does not contain the expected NameForge identity');
-if (!html.includes(`href="${baseUrl}"`)) failures.push('Published HTML canonical link does not match ' + baseUrl);
-if (!html.includes(`content="${baseUrl}"`)) failures.push('Published HTML og:url does not match ' + baseUrl);
+if (!html.includes(`href="${canonicalUrl}"`)) failures.push('Published HTML canonical link does not match ' + canonicalUrl);
+if (!html.includes(`content="${canonicalUrl}"`)) failures.push('Published HTML og:url does not match ' + canonicalUrl);
 if (/https?:\/\/hhkskkkdjwbf\.github\.io|jjspa4830-hue\.github\.io/i.test(html)) failures.push('Published HTML contains a forbidden legacy or misspelled origin');
 
 const assetPaths = [
