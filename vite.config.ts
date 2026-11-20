@@ -2,8 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-// Use relative asset paths so the app works under the GitHub Pages
-// NameForge GitHub Pages URL (/NameForge/) as well as local previews.
+// Use relative asset paths so the static app works at the Cloudflare Pages
+// project root and in local previews.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: './',

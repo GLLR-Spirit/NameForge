@@ -2,11 +2,11 @@
 
 > A multilingual creative naming workspace for brands, businesses, characters, stories, games, fictional worlds and personal projects.
 
-**Live website:** https://gllr-spirit.github.io/NameForge/
+**Live website:** https://nameforge-bhk.pages.dev/
 **Source repository:** https://github.com/GLLR-Spirit/NameForge
 **Default interface language:** English
 **Application type:** client-side React web application with a limited installable/offline-capable shell
-**Hosting:** GitHub Pages
+**Hosting:** Cloudflare Pages
 
 ---
 

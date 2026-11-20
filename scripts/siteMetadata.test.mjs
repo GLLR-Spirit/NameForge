@@ -8,7 +8,7 @@ assert.ok(sitemap.includes('<urlset'), 'sitemap must contain a urlset root');
 assert.ok(sitemap.includes('</urlset>'), 'sitemap must close its urlset root');
 assert.deepEqual(
   locations,
-  ['https://gllr-spirit.github.io/NameForge/'],
+  ['https://nameforge-bhk.pages.dev/'],
   'source fallback sitemap should include the homepage before build-time expansion'
 );
 assert.ok(
@@ -82,9 +82,9 @@ console.log('Phase 4 workspace checks passed: multi-criteria search, saved proje
 
 
 const seoGenerator = readFileSync(new URL('../scripts/generate-seo-pages.ts', import.meta.url), 'utf8');
-assert.ok(seoGenerator.includes("const SITE_URL = 'https://gllr-spirit.github.io/NameForge'"), 'SEO landing pages must use the current GitHub Pages origin');
+assert.ok(seoGenerator.includes("const SITE_URL = 'https://nameforge-bhk.pages.dev'"), 'SEO landing pages must use the Cloudflare Pages origin');
 
-const CANONICAL_ORIGIN = 'https://gllr-spirit.github.io/NameForge/';
+const CANONICAL_ORIGIN = 'https://nameforge-bhk.pages.dev/';
 const FORBIDDEN_ORIGINS = [
   /https?:\/\/hhkskkkdjwbf\.github\.io/i,
   /jjspa4830-hue\.github\.io/i,
@@ -94,17 +94,17 @@ const FORBIDDEN_ORIGINS = [
 const robotsTxt = readFileSync(new URL('../public/robots.txt', import.meta.url), 'utf8');
 assert.ok(
   robotsTxt.includes(`Sitemap: ${CANONICAL_ORIGIN}sitemap.xml`),
-  'public/robots.txt must declare the canonical NFV2 sitemap URL'
+  'public/robots.txt must declare the Cloudflare Pages sitemap URL'
 );
 
 const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 assert.ok(
   indexHtml.includes(`<link rel="canonical" href="${CANONICAL_ORIGIN}" />`),
-  'index.html canonical link must match the official NFV2 production origin'
+  'index.html canonical link must match the Cloudflare Pages production origin'
 );
 assert.ok(
   indexHtml.includes(`<meta property="og:url" content="${CANONICAL_ORIGIN}" />`),
-  'index.html og:url must match the official NFV2 production origin'
+  'index.html og:url must match the Cloudflare Pages production origin'
 );
 assert.ok(
   indexHtml.includes(`<meta property="og:image" content="${CANONICAL_ORIGIN}images/og-image.jpg" />`),
@@ -122,7 +122,7 @@ assert.ok(
 const smokeScript = readFileSync(new URL('../scripts/github-pages-smoke.mjs', import.meta.url), 'utf8');
 assert.ok(
   smokeScript.includes(CANONICAL_ORIGIN),
-  'github-pages-smoke.mjs must default to the official NFV2 production origin'
+  'github-pages-smoke.mjs must default to the Cloudflare Pages production origin'
 );
 
 const filesToGuard = [
