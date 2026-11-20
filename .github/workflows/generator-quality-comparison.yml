@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
       - name: Install current dependencies
-        run: npm install
+        run: npm ci
       - name: Prepare baseline source revision
         env:
           BASELINE_REF: 7db8a742906000106c5bc43b99238ea6c60caee3
@@ -39,7 +39,7 @@ jobs:
       - name: Run the exact same baseline protocol on the pre-improvement revision
         working-directory: /tmp/nameforge-before
         run: |
-          npm install
+          npm ci
           npx --yes tsx scripts/generator-quality-baseline.ts
           mkdir -p "$GITHUB_WORKSPACE/artifacts/generator-quality-comparison"
           cp artifacts/generator-quality-audit/baseline.json "$GITHUB_WORKSPACE/artifacts/generator-quality-comparison/before.json"

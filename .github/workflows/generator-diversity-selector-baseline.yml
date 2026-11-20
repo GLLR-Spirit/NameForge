@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
       - name: Install current dependencies
-        run: npm install
+        run: npm ci
       - name: Prepare pre-selector revision
         env:
           BEFORE_SELECTOR_REF: ef2a8376d538bc5fa5a942d8eaf2892866fab6ca
@@ -38,7 +38,7 @@ jobs:
       - name: Run identical audit without the candidate selector
         working-directory: /tmp/nameforge-before-selector
         run: |
-          npm install
+          npm ci
           npx --yes tsx scripts/generator-quality-baseline.ts
           mkdir -p "$GITHUB_WORKSPACE/artifacts/diversity-selector-comparison"
           cp artifacts/generator-quality-audit/baseline.json "$GITHUB_WORKSPACE/artifacts/diversity-selector-comparison/before.json"
