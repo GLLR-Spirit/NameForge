@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://gllr-spirit.github.io/nameforge/sitemap.xml
+Sitemap: https://gllr-spirit.github.io/NameForge/sitemap.xml

@@ -165,11 +165,11 @@ jobs:
       - name: Smoke-test the published GitHub Pages site
         run: npm run audit:pages
         env:
-          PAGES_BASE_URL: https://gllr-spirit.github.io/nameforge/
+          PAGES_BASE_URL: https://gllr-spirit.github.io/NameForge/
       - name: Audit the published GitHub Pages site
         run: npm run audit:lighthouse
         env:
-          LIGHTHOUSE_BASE_URL: https://gllr-spirit.github.io/nameforge/
+          LIGHTHOUSE_BASE_URL: https://gllr-spirit.github.io/NameForge/
       - name: Upload live Lighthouse report
         if: always()
         uses: actions/upload-artifact@v4
