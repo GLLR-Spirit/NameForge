@@ -213,3 +213,79 @@ Conséquence : pour les fichiers binaires et modules dont l'historique antérieu
 | Traductions | Importées par le commit de migration | Historique de traduction et auteurs non établis dans cette passe | Origine et droits à documenter |
 | Prénoms/données | Importés par le commit de migration | Références par entrée non établies dans cette passe | Sources et exactitude à documenter |
 
+
+
+## 10. Compléments de vérification — inventaire exact du dépôt
+
+Contrôle complémentaire effectué le 2026-11-20 sur l'arbre Git récursif de `main` (255 entrées, réponse non tronquée).
+
+### 10.1 Inventaire des images versionnées
+
+Les fichiers image présents dans les répertoires de marque examinés sont exactement :
+
+- `public/images/nameforge-logo.jpg`
+- `public/images/og-image.jpg`
+- `public/images/icon-32.png`
+- `public/images/icon-180.png`
+- `public/images/icon-192.png`
+- `public/images/icon-512.png`
+- `src/assets/images/nameforge-logo-128.png`
+
+L'arbre confirme leur présence, mais ne donne pas leur auteur, leur licence ni leur historique de création. Le contenu binaire et les métadonnées EXIF/XMP n'ont pas été inspectés dans cette passe. Il n'est donc pas possible de conclure qu'elles sont originales ou tierces. Aucune image n'a été remplacée.
+
+### 10.2 Inventaire des modules de traduction
+
+Les modules versionnés dans `src/i18n/` sont :
+
+`addedFaq.ts`, `addedGeneratorContent.ts`, `addedGeneratorTitles.ts`, `addedLanguages.ts`, `addedNameTranslations.ts`, `attestedNameTranslations.ts`, `collectionModal.ts`, `compareModal.ts`, `enhancementsLabels.ts`, `extraLanguages.ts`, `generatorContent.ts`, `generatorDiscoveryLabels.ts`, `generatorTitles.ts`, `index.ts`, `languageModal.ts`, `localeRegistry.ts`, `localizedFaq.ts`, `localizedGeneratorMeta.ts`, `moduleLabels.ts`, `myNames.ts`, `nameDetails.ts`, `nameInsightLabels.ts`, `nameIntelligenceLabels.ts`, `newLanguageTranslations.ts`, `seoMetadata.ts`, `shell.ts`, `studio.ts`, `styleLabels.ts`, `unifiedAnalysisLabels.ts`.
+
+L'inventaire confirme 29 modules. Les fichiers examinés ne contiennent pas de registre de traducteur ou de méthode suffisamment systématique. Il faut attribuer un statut par module (rédaction originale, traduction humaine, traduction machine/IA, traduction mixte, source tierce ou inconnu) et ne pas déduire ce statut du style du texte.
+
+### 10.3 Métadonnées exactes des licences npm
+
+Le `package-lock.json` actuellement lu est au format lockfile version 3 et contient 277 entrées de packages. Les métadonnées de licence particulières relevées sont :
+
+| Package | Version verrouillée | Métadonnée SPDX |
+|---|---:|---|
+| `axe-core` | 4.14.0 | MPL-2.0 |
+| `caniuse-lite` | 1.0.30001826 | CC-BY-4.0 |
+| `graceful-fs` | 4.2.12 | BlueOak-1.0.0 |
+| `lightningcss` | 1.33.0 | MPL-2.0 |
+| `lightningcss-android-arm64` | 1.33.0 | MPL-2.0 |
+| `lightningcss-darwin-arm64` | 1.33.0 | MPL-2.0 |
+| `lightningcss-darwin-x64` | 1.33.0 | MPL-2.0 |
+| `lightningcss-freebsd-x64` | 1.33.0 | MPL-2.0 |
+| `lightningcss-linux-arm-gnueabihf` | 1.33.0 | MPL-2.0 |
+| `lightningcss-linux-arm64-gnu` | 1.33.0 | MPL-2.0 |
+| `lightningcss-linux-arm64-musl` | 1.33.0 | MPL-2.0 |
+| `lightningcss-linux-x64-gnu` | 1.33.0 | MPL-2.0 |
+| `lightningcss-linux-x64-musl` | 1.33.0 | MPL-2.0 |
+| `lightningcss-win32-arm64-msvc` | 1.33.0 | MPL-2.0 |
+| `lightningcss-win32-x64-msvc` | 1.33.0 | MPL-2.0 |
+| `type-fest` | 4.41.0 | (MIT OR CC0-1.0) |
+
+Ces métadonnées proviennent du lockfile; elles ne remplacent pas les textes de licence des paquets exacts. Les entrées particulières ci-dessus sont marquées `dev: true` dans le lockfile. Il faut néanmoins vérifier si les exécutables, binaires ou données de ces outils sont inclus dans les livrables distribués. Le présent contrôle ne certifie pas encore la conformité des notices.
+
+### 10.4 Données et fichiers éditoriaux — observations complémentaires
+
+- `attestedBabyNames.ts` (20 940 caractères au moment du contrôle) contient des prénoms, origines, significations et variantes. Les entrées visibles ne portent pas de référence source individuelle. Une révision linguistique et documentaire reste nécessaire; la présence d'un commentaire de fichier ne suffit pas à sourcer chaque étymologie.
+- `englishDomainPools.ts` (78 174 caractères) contient des pools de vocabulaire et des noms propres ou semi-propres. Séparer les mots courants, créations éditoriales et éléments qui peuvent évoquer des marques ou personnes existantes.
+- `businessAndCreativeCategories.ts` (35 513 caractères) contient des catégories et textes descriptifs. Les avertissements relatifs à la disponibilité des marques ne remplacent pas une recherche de disponibilité ni un avis juridique.
+- `japaneseKatakanaReference.ts` précise que ses paires sont des exemples de conversion et non un dictionnaire de prénoms japonais attestés. Conserver cette limitation et faire valider la translittération par une personne compétente avant de présenter les sorties comme linguistiquement fiables.
+- Les banques Expansion A et B contiennent notamment des phrases de présentation, titres de chansons fictifs, noms de groupes, opérations et boutiques. Leur forme éditoriale ne permet pas, à elle seule, de conclure qu'elles sont originales ou issues d'une source externe.
+
+### 10.5 Correction de périmètre
+
+Le précédent tableau décrivait 276 entrées npm. Le contrôle direct du lockfile actuellement sur `main` compte 277 entrées. Ce chiffre est la référence de ce complément. Il peut évoluer à chaque changement de dépendances; régénérer l'inventaire après toute mise à jour de `package-lock.json`.
+
+## 11. Plan d'exécution restant
+
+1. **Images** : obtenir les fichiers originaux et les preuves de création/achat/licence; examiner visuellement chaque fichier et ses métadonnées; remplacer seulement ceux qui restent non justifiables.
+2. **Banques A/B et base** : reconstruire la provenance depuis les historiques, les fichiers de travail, exports IA et conversations/outils éventuellement conservés. Une provenance inconnue reste explicitement inconnue; ne pas fabriquer une déclaration rétroactive.
+3. **Traductions** : produire un registre par module avec langue, rédacteur/relecteur, méthode, date, texte source et preuve disponible. Faire réviser les langues à risque par des locuteurs compétents.
+4. **Prénoms et étymologies** : sourcer les significations et origines au niveau de chaque entrée; retirer ou reformuler les affirmations non vérifiées si une publication fiable est recherchée.
+5. **npm/Rust** : générer les notices complètes à partir des versions réellement résolues et des artefacts distribués; créer et contrôler `Cargo.lock`; archiver les fichiers de licence des versions exactes.
+6. **Code** : établir un inventaire des auteurs/contributions et des éventuelles parties réutilisées avant de choisir une licence pour le dépôt.
+7. **Validation finale** : tests de build, tests fonctionnels, revue des attributions, comparaison du diff et vérification du site de préproduction avant toute fusion dans `main`.
+
+Aucune modification du moteur, des données runtime, des images, des licences ou de la branche `main` n'est effectuée par cet ajout documentaire.
