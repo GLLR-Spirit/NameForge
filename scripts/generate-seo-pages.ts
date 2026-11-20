@@ -8,7 +8,7 @@ import { getOpenGraphLocale, getSeoDescription } from '../src/i18n/seoMetadata';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const DIST = join(ROOT, '..', 'dist');
-const SITE_URL = 'https://gllr-spirit.github.io/NameForge';
+const SITE_URL = 'https://nameforge-bhk.pages.dev';
 const APP_URL = `${SITE_URL}/`;
 
 /** The 28 fully translated interface languages (25 original + uk, bn, nb). English keeps the historical /seo/generators/<id>/ URLs. */
@@ -131,9 +131,14 @@ ${alternateLinks(generator.id)}
   <meta property="og:title" content="${escapeHtml(pageTitle)}">
   <meta property="og:description" content="${escapeHtml(description)}">
   <meta property="og:locale" content="${escapeHtml(getOpenGraphLocale(lang))}">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="${APP_URL}images/og-image.jpg">
+  <meta property="og:image:type" content="image/jpeg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${escapeHtml(pageTitle)}">
   <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${APP_URL}images/og-image.jpg">
   <script type="application/ld+json">${structuredData}</script>
 </head>
 <body>
@@ -160,9 +165,8 @@ async function main(): Promise<void> {
   await mkdir(join(DIST, 'seo'), { recursive: true });
   await writeFile(join(DIST, 'seo', 'seo.css'), SEO_CSS, 'utf8');
 
-  const lastmod = new Date().toISOString().slice(0, 10);
   const entries: string[] = [
-    `  <url><loc>${escapeXml(APP_URL)}</loc><lastmod>${lastmod}</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>`,
+    `  <url><loc>${escapeXml(APP_URL)}</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>`,
   ];
   let pages = 0;
 
@@ -172,7 +176,7 @@ async function main(): Promise<void> {
       await mkdir(dirname(outputPath), { recursive: true });
       await writeFile(outputPath, renderPage(generator, lang), 'utf8');
       entries.push(
-        `  <url><loc>${escapeXml(pageUrlFor(lang, generator.id))}</loc><lastmod>${lastmod}</lastmod></url>`
+        `  <url><loc>${escapeXml(pageUrlFor(lang, generator.id))}</loc></url>`
       );
       pages++;
     }
