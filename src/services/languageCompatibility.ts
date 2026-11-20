@@ -670,7 +670,7 @@ export function getCategoryLanguageCompatibility(
     };
   }
 
-  // 2. Curated native phrase banks across all 28 languages
+  // 2. Retained for any future phrase-bank source that receives explicit rights approval; current banks are quarantined.
   if (categoryIdentity === 'curated-phrase-bank') {
     return {
       generatorId,
@@ -1000,6 +1000,7 @@ const FAMILY_LABELS_LOCALIZED: Record<string, Record<string, string>> = {
 
 export function resolveGeneratorCompatibilityDomain(generatorId: GeneratorId): ProfileDomainKey {
   if (generatorId === 'baby_name') return 'attested';
+  // The active phrase-bank registry is empty while all unverified editorial banks are quarantined.
   if (PHRASE_BANK_SET.has(generatorId)) return 'phraseBank';
   if (JAPANESE_ANIME_GENERATORS.has(generatorId)) return 'anime';
   if (DESERT_CULTURAL_IDS.has(generatorId)) return 'desert';
