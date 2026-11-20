@@ -217,3 +217,45 @@ Cette décision n'affirme pas que les banques sont illicites ou qu'elles contien
 - Une réévaluation ne sera justifiée que si des exports/prompts contemporains, des brouillons ou une vérification entrée par entrée apportent de nouvelles preuves.
 
 Aucun code applicatif, fichier de banque, traduction, image, branche main ou déploiement n'a été modifié par cette décision documentaire.
+
+
+## 12. Examen de trois archives supplémentaires — 2026-11-20
+
+Une nouvelle recherche dans la bibliothèque de fichiers a permis d'identifier et d'examiner trois archives supplémentaires qui n'étaient pas incluses dans la première passe :
+
+| Archive | Taille compressée | SHA-256 | Contenu pertinent |
+|---|---:|---|---|
+| `NameForge-corrige-local.zip` | 2 910 485 octets | `e2cc9198d9cf0dec9fcaf1e048030bf9669e8f557522c028fabdb5f7bd3a9c` | Snapshot de projet sous `nameforge-audit/NameForge-main/`; contient les trois fichiers de banques et le manifeste de datasets. |
+| `NameForge.Version.3(1).zip` | 2 895 273 octets | `f2d486adaa7cdd447f031f4565b970eea0f042ddce8ecd50db0a10dd2c86150f` | Snapshot de projet; contient les trois fichiers de banques et le manifeste de datasets. |
+| `NameForge.Version.3.zip` | 10 476 184 octets | `4ff5390dd064b41d7e4500fb116845655e9f2713ed9d534bb82f0d5691a2413` | Archive avec dossier `.aistudio`, manifeste de transfert, patch et archive compagnon; contient aussi les trois fichiers de banques et le manifeste de datasets. |
+
+### Comparaison des fichiers de banques
+
+Les SHA-256 des trois fichiers de banques sont identiques dans les trois archives supplémentaires et dans `nfv2.zip` :
+
+| Fichier | Taille en octets | SHA-256 |
+|---|---:|---|
+| `src/data/phraseBanks.ts` | 177 745 | `6f7ad2fdde491c78…` |
+| `src/data/phraseBanksExpansionA.ts` | 67 842 | `c2c37b9b1c07916e…` |
+| `src/data/phraseBanksExpansionB.ts` | 59 455 | `8aacae5ada1eeaa1…` |
+| `src/data/datasetManifest.ts` | 7 116 | `2ddc2080219a45e0…` |
+
+Cette identité binaire établit que ces archives supplémentaires ne fournissent pas une nouvelle version des banques ni une nouvelle provenance des mêmes chaînes. Elles corroborent la persistance des mêmes fichiers dans plusieurs snapshots. Elles ne prouvent pas leur auteur, leur date de création initiale ou leurs conditions de réutilisation.
+
+### Vérification du manifeste de données
+
+Les quatre snapshots comparés portent le même manifeste `datasetManifest.ts`. Il maintient les banques historiques sous le statut `editorial-unverified`, sans licence déclarée, avec redistribution `restricted-or-unverified`. Les ressources candidates (Open English WordNet, Wiktionary/Kaikki, Tatoeba, CMUdict, etc.) restent au statut `candidate-review`; elles ne sont pas déclarées comme sources effectivement importées pour les banques historiques.
+
+### Traces de tests retrouvées dans la bibliothèque
+
+Un journal de terminal archivé contient notamment les résultats suivants : `Existing banks are not cleared for redistribution`, `External candidates are not runtime-enabled` et `Current editorial banks remain flagged but are not represented as approved sources`, avec un bilan de 6/6 contrôles de provenance du manifeste. Ces sorties corroborent le fait que les contrôles du projet appliquaient le statut de non-approbation. Elles ne constituent ni une expertise juridique ni une preuve de provenance des phrases.
+
+### Résultat de cette passe
+
+- Trois archives supplémentaires examinées.
+- Aucun prompt, transcript ou export Google AI Studio/ChatGPT relié aux banques n'a été trouvé dans ces archives.
+- Les trois fichiers de banques et le manifeste sont binaires identiques aux versions déjà examinées.
+- Aucun nouvel élément ne justifie de modifier la décision de quarantaine.
+- **Décision maintenue : ne pas réintégrer les 19 banques dans la version publique à ce stade.**
+
+Les archives ont été examinées en lecture seule. Aucun fichier de banque, code applicatif, branche `main` ou déploiement n'a été modifié par cette passe.
