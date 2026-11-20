@@ -1,11 +1,11 @@
 import { chromium } from 'playwright';
 
-const baseUrl = process.env.PAGES_BASE_URL || 'https://gllr-spirit.github.io/NameForge/';
+const baseUrl = process.env.PAGES_BASE_URL || 'https://nameforge-bhk.pages.dev/';
 const failures = [];
 const checks = [];
 
 const response = await fetch(baseUrl, { redirect: 'follow' });
-if (!response.ok) throw new Error('GitHub Pages returned HTTP ' + response.status + ' for ' + baseUrl);
+if (!response.ok) throw new Error('Published site returned HTTP ' + response.status + ' for ' + baseUrl);
 const html = await response.text();
 if (!/<title>[^<]+<\/title>/i.test(html)) failures.push('Published HTML has no document title');
 if (!/nameforge/i.test(html)) failures.push('Published HTML does not contain the expected NameForge identity');
