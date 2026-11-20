@@ -160,3 +160,60 @@ Ce résultat signifie uniquement qu'aucune pièce probante n'a été retrouvée 
 La déclaration du propriétaire demeure la seule indication disponible concernant l'usage de ChatGPT pour la majorité des phrases originales. La recherche complémentaire n'a pas permis de la corroborer par des conversations ou prompts contemporains. Le statut reste donc : **génération IA déclarée par le propriétaire pour la majorité du texte source; corroboration indépendante et attribution par famille non disponibles**.
 
 Aucun contenu des banques n'a été modifié ou réintégré. Aucune modification n'a été apportée à la branche `main`.
+
+
+## 11. Complément de recherche : souvenir d'utilisation de Google AI Studio et décision de réintégration — 2026-11-20
+
+### Déclaration complémentaire du propriétaire
+
+Dans une conversation antérieure du 20 novembre 2026, le propriétaire a indiqué avoir parfois utilisé « Google AI Studio » pour produire des phrases NameForge, puis a précisé ne plus se souvenir de son utilisation exacte pour ce projet. Il a également indiqué posséder l'archive ZIP Google AI Studio et les comptes associés.
+
+Cette information complète la déclaration précédente sur ChatGPT : **l'origine IA pourrait être mixte (ChatGPT et, pour certains lots, Google AI Studio), mais la répartition entre outils, familles et versions reste inconnue**. Il s'agit d'un souvenir du propriétaire, pas d'une preuve technique du contenu de chaque fichier. La possession d'une archive ou d'un compte ne prouve pas que les prompts de génération des banques s'y trouvent.
+
+### Réexamen des traces Google AI Studio
+
+Le dossier .aistudio/artifacts/brain/... de nfv2.zip contient un manifeste de transfert, un patch unifié et une archive compagnon. L'examen du manifeste et de la structure de ce dossier ne révèle pas de transcript de conversation, de journal de prompts ni d'export de génération relié aux 19 familles. Les éléments retrouvés documentent un transfert technique du dépôt historique, pas la création du corpus.
+
+### Sources externes et droits de réutilisation
+
+Les documents historiques du projet recensent des ressources candidates telles qu'Open English WordNet, Wiktionary/Kaikki, Tatoeba et CMU Pronouncing Dictionary. Ils précisent que ces ressources ne sont pas importées dans le moteur comme sources approuvées et imposent une traçabilité par entrée pour tout futur import.
+
+Aucune des pièces examinées ne relie une entrée des 19 banques à l'une de ces ressources, ni à une URL externe, un identifiant de source, une licence ou une attribution. Il est donc impossible de conclure que les banques proviennent de ces ressources; il est tout aussi impossible de certifier qu'aucune phrase n'a été reprise ou adaptée d'une source externe. La recherche n'a pas constitué une comparaison exhaustive de chaque chaîne avec le Web, des livres ou des bases sous licence.
+
+Le manifeste src/data/datasetManifest.ts classe les banques historiques comme editorial-unverified, indique une licence non déclarée, demande de confirmer les contributeurs et la titularité, et marque la redistribution restricted-or-unverified. Dans cette structure, runtimeEnabled: true signifie uniquement que les données étaient utilisées par la version historique de l'application : ce champ n'est pas une autorisation juridique de redistribution. docs/PHASE3-DATA-SOURCES.md précise également que les banques ne doivent pas être présentées comme domaine public ou données libres, ni être relicenciées sans confirmation des droits.
+
+### Évaluation de réutilisation
+
+| Question | Conclusion à partir des preuves disponibles |
+|---|---|
+| Le propriétaire se souvient-il d'un recours à ChatGPT ? | Oui, principalement pour la majorité des phrases originales, selon sa déclaration rétrospective. |
+| Le propriétaire se souvient-il d'un recours à Google AI Studio ? | Oui, parfois; il ne se souvient pas des lots ou usages exacts. |
+| Peut-on attribuer une famille à un outil précis ? | Non. |
+| Peut-on prouver que chaque chaîne est un résultat IA original non repris ? | Non. |
+| Une source externe précise est-elle identifiée pour une entrée ? | Non dans les pièces examinées. |
+| Peut-on exclure une reprise/adaptation externe ? | Non. |
+| Une licence de redistribution est-elle documentée ? | Non. |
+| La génération par IA suffit-elle à établir automatiquement un droit exclusif et une libre redistribution ? | Non; la provenance, les conditions du service au moment de la génération, les éventuelles contributions humaines et les ressemblances avec des contenus tiers restent à examiner. |
+
+### Décision finale de cette passe
+
+**Décision : NE PAS RÉINTÉGRER les 19 banques historiques dans la version publique à ce stade.**
+
+Motifs :
+1. aucune traçabilité prompt/famille/entrée n'a été retrouvée;
+2. l'usage déclaré de ChatGPT et de Google AI Studio n'est pas ventilé par lot;
+3. aucune source externe n'est attribuée par entrée et aucune recherche exhaustive d'antériorité n'a été réalisée;
+4. aucune licence ou preuve suffisante de titularité/permission ne valide actuellement la redistribution;
+5. la documentation historique du projet elle-même classe ces banques comme editorial-unverified et restricted-or-unverified.
+
+Cette décision n'affirme pas que les banques sont illicites ou qu'elles contiennent nécessairement des contenus tiers. Elle signifie que les éléments disponibles ne permettent pas de les autoriser de manière responsable pour la republication ou la monétisation.
+
+### Conséquences opérationnelles
+
+- Maintenir les trois fichiers historiques en quarantaine/hors du runtime public.
+- Ne pas rétablir les anciennes chaînes à partir des ZIP.
+- Ne pas ajouter de licence ouverte ni revendiquer une exclusivité sur les phrases.
+- Conserver les archives originales en tant que pièces de référence, sans les présenter comme preuve suffisante de titularité.
+- Une réévaluation ne sera justifiée que si des exports/prompts contemporains, des brouillons ou une vérification entrée par entrée apportent de nouvelles preuves.
+
+Aucun code applicatif, fichier de banque, traduction, image, branche main ou déploiement n'a été modifié par cette décision documentaire.
