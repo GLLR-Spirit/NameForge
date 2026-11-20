@@ -10,15 +10,15 @@
 
 Les pièces examinées permettent d'établir un élément important : le document interne `docs/I18N.md` affirme explicitement que **les traductions créées pour les ajouts du projet, dont les banques de phrases, ont été écrites par l'assistant de manière automatique et n'ont pas été relues par des locuteurs natifs**.
 
-Cette déclaration documente une origine assistée/produite par IA pour les **versions traduites** des banques. Elle ne permet toutefois pas d'identifier :
+Cette déclaration documente une origine assistée/produite par IA pour les **versions traduites** des banques. En complément, le propriétaire du projet déclare rétrospectivement que **la plupart des phrases originales ont été générées par une IA, principalement ChatGPT**. Cette déclaration constitue un renseignement de provenance fourni par le propriétaire; elle n'est pas corroborée, dans les archives examinées, par des prompts ou exports reliant les phrases aux générations concernées. Le terme « la plupart » signifie que des exceptions sont possibles et que leur répartition par famille ou par lot reste inconnue. Cette déclaration ne permet toutefois pas d'identifier :
 - le service ou modèle exact utilisé;
 - les prompts, conversations ou exports qui auraient produit chaque lot;
 - la langue qui aurait servi de texte source initial;
-- l'origine des formulations de départ;
+- l'origine exacte de chaque formulation de départ, notamment la répartition des exceptions à la génération IA;
 - la part éventuelle de rédaction, sélection ou réécriture humaine;
 - l'existence ou l'absence d'éléments repris de sources externes.
 
-**Conclusion de classement :** pour les 19 familles, la composante traduite est documentée comme machine-écrite par l'assistant selon la documentation du projet; la provenance du texte source et la ventilation entre création personnelle, génération IA et sources externes restent indéterminées. Il serait inexact de classer les 19 familles intégralement comme « créations personnelles » ou intégralement comme « générées par IA ».
+**Conclusion de classement :** les traductions sont documentées comme machine-écrites par l'assistant selon la documentation du projet. Le propriétaire déclare que la plupart des phrases originales ont été générées par une IA, principalement ChatGPT, mais les archives ne permettent pas encore de vérifier ni de ventiler cette déclaration par famille/lot. La génération IA du texte source est donc **déclarée par le propriétaire pour la majorité du corpus**, et non indépendamment démontrée pour chaque entrée. L'origine des exceptions éventuelles et la présence éventuelle de sources externes restent indéterminées. Il serait inexact de classer toutes les 19 familles sans distinction comme intégralement générées par ChatGPT.
 
 ## 2. Sources effectivement examinées
 
@@ -69,7 +69,7 @@ Le comptage a été réalisé sur les chaînes de chaque fichier, en comptant le
 | Dimension | Résultat documenté | Classement |
 |---|---|---|
 | Création personnelle du texte source | Aucun brouillon, historique de rédaction ou déclaration détaillée reliant la création aux familles n'est présent dans les pièces examinées. | **Non établi** |
-| Génération IA du texte source | Pas de prompt, export ou historique permettant d'attribuer les formulations sources à un modèle. | **Non établi** |
+| Génération IA du texte source | Le propriétaire déclare rétrospectivement que la plupart des phrases originales ont été générées par une IA, principalement ChatGPT; aucun prompt/export ne relie actuellement les entrées à ces générations. | **Déclarée pour la majorité; non vérifiée entrée par entrée** |
 | Traductions | `docs/I18N.md` indique que les traductions des banques ont été machine-écrites par l'assistant. | **IA documentée au niveau de la déclaration projet** |
 | Service/modèle IA | Non nommé dans la documentation consultée. | **Inconnu** |
 | Intervention humaine | Sélection, correction, adaptation et validation par famille non détaillées. | **Inconnu** |
@@ -77,7 +77,17 @@ Le comptage a été réalisé sur les chaînes de chaque fichier, en comptant le
 | Licence et redistribution | Licence non déclarée; manifeste marqué `restricted-or-unverified`. | **Non validées — blocage de redistribution** |
 | Revue linguistique | La documentation indique que les traductions n'ont pas été revues par des locuteurs natifs. | **Non effectuée selon la déclaration projet** |
 
-## 5. Points particuliers de l'historique
+## 5. Déclaration rétrospective du propriétaire
+
+Le propriétaire du projet indique : **« Elles avaient été générées par une IA la plupart du temps, principalement ChatGPT. »** Cette déclaration porte sur les phrases originales avant traduction. Elle est consignée comme déclaration du propriétaire, et non comme preuve technique indépendante.
+
+- Portée déclarée : la majorité des phrases originales.
+- Outil le plus souvent utilisé selon le souvenir du propriétaire : ChatGPT.
+- Modèle exact, dates, prompts, conversations et exports : non fournis/non établis.
+- Familles et lots concernés par les éventuelles exceptions : non précisés.
+- Cette déclaration ne permet pas d'exclure une éventuelle utilisation de sources externes pour certaines entrées.
+
+## 6. Points particuliers de l'historique
 
 - Le dépôt historique est mentionné dans le manifeste de transfert comme dépôt source de la chaîne de développement.
 - Des messages de commits historiques cités dans le registre de droits existant mentionnent des expansions de banques videogame et shop. Ces intitulés montrent des opérations de développement; ils ne prouvent pas la création originale des formulations ni leurs sources.
@@ -85,18 +95,18 @@ Le comptage a été réalisé sur les chaînes de chaque fichier, en comptant le
 - Le mot « curated » dans un commentaire ou un README est une qualification éditoriale du projet, pas une preuve d'origine.
 - La mention « machine-written by the assistant » concerne les traductions des ajouts selon `docs/I18N.md`; elle ne permet pas d'affirmer que Google AI Studio est le service qui les a produites.
 
-## 6. Décision provisoire par famille
+## 7. Décision provisoire par famille
 
 Les 19 familles reçoivent le même statut de droits à ce stade, mais pas parce que leur contenu serait nécessairement de même origine :
 
-- **Texte source : provenance indéterminée.**
+- **Texte source : génération IA déclarée par le propriétaire pour la majorité des phrases, principalement via ChatGPT; vérification et ventilation par famille/entrée encore manquantes.**
 - **Versions traduites : production machine/IA déclarée dans la documentation du projet; outil exact et traçabilité par phrase manquants.**
 - **Sources externes : aucune source précise identifiée dans les pièces examinées; vérification exhaustive non réalisée.**
 - **Création personnelle : non démontrée par les pièces examinées.**
 - **Licence : non déclarée; redistribution non validée.**
 - **Production : conserver en quarantaine; ne pas restaurer, republier ou monétiser sur la base de ce seul audit.**
 
-## 7. Informations à recueillir pour lever les incertitudes
+## 8. Informations à recueillir pour lever les incertitudes
 
 Pour chaque famille et, si nécessaire, pour chaque lot de langue :
 
@@ -109,7 +119,7 @@ Pour chaque famille et, si nécessaire, pour chaque lot de langue :
 
 Une réponse rétrospective du propriétaire doit être identifiée comme **déclaration**, séparément des preuves contemporaines. Elle peut orienter l'audit mais ne doit pas être présentée comme une preuve indépendante.
 
-## 8. État des changements
+## 9. État des changements
 
 - Ce document ajoute uniquement un résultat d'audit documentaire.
 - Aucun fichier de banque, générateur, traduction ou image n'a été modifié.
