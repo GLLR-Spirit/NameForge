@@ -470,3 +470,60 @@ Les 11 fichiers strictement identiques comprennent notamment des fichiers de gé
 Cette comparaison confirme une parenté technique entre les deux snapshots, mais pas leur ordre chronologique. Le nombre de fichiers, les noms des archives et les différences de contenu ne suffisent pas à dater précisément chaque snapshot. Le manifeste de transfert contenu dans `nfv2.zip` décrit une opération par rapport à un commit de référence historique, mais il ne prouve pas que `NameForge.Version.2.zip` est exactement ce commit de base.
 
 Aucune fusion automatique des deux archives n'est justifiée. Pour toute réutilisation, comparer les fichiers individuellement avec le dépôt actuel, conserver les empreintes et examiner les différences avant intégration.
+
+
+## 17. Comparaison des archives avec `main` — 2026-11-20
+
+### 17.1 Méthode
+
+Les fichiers des deux ZIP ont été extraits en lecture seule. Pour chaque fichier, une empreinte Git blob SHA-1 a été calculée sur les octets exacts (en-tête Git `blob <taille>\0` inclus), puis comparée à l'empreinte du blob correspondant dans l'arbre GitHub de `main` au commit `aaaf61ff42516435ddbeb493aa4e83a7d74a8c2e`. Une empreinte identique établit une identité octet par octet; une empreinte différente établit seulement que les octets diffèrent, pas que le contenu est juridiquement tiers ou original.
+
+### 17.2 Banques de phrases historiques
+
+Dans `nfv2.zip`, les trois fichiers historiques suivants sont présents :
+
+- `src/data/phraseBanks.ts` — 177 745 octets;
+- `src/data/phraseBanksExpansionA.ts` — 67 842 octets;
+- `src/data/phraseBanksExpansionB.ts` — 59 455 octets.
+
+Dans `main`, seul `src/data/phraseBanks.ts` existe à ce chemin; il s'agit d'un fichier de quarantaine de 972 octets, dont l'empreinte diffère de celle du fichier historique. Les deux fichiers d'expansion ne sont pas présents dans l'arbre actuel. Le fichier actif de `main` expose une liste vide de banques approuvées et retourne une liste vide de phrases; les 19 identifiants historiques sont explicitement placés en quarantaine.
+
+Conséquence : les archives contiennent des copies historiques des banques, mais elles ne constituent pas une autorisation de les remettre en production. Le manifeste de transfert Google AI Studio ne fournit pas de provenance d'auteur ou de licence entrée par entrée pour ces banques. Elles restent non vérifiées et doivent rester hors runtime jusqu'à preuve suffisante.
+
+### 17.3 Images et ressources graphiques
+
+Les sept images présentes dans `nfv2.zip` correspondent toutes, octet pour octet, aux sept images de `main` :
+
+| Fichier | Taille dans l'archive | Résultat |
+|---|---:|---|
+| `public/images/icon-180.png` | 36 831 octets | Identique à `main` |
+| `public/images/icon-192.png` | 41 351 octets | Identique à `main` |
+| `public/images/icon-32.png` | 1 783 octets | Identique à `main` |
+| `public/images/icon-512.png` | 264 891 octets | Identique à `main` |
+| `public/images/nameforge-logo.jpg` | 454 191 octets | Identique à `main` |
+| `public/images/og-image.jpg` | 32 379 octets | Identique à `main` |
+| `src/assets/images/nameforge-logo-128.png` | 44 208 octets | Identique à `main` |
+
+Cette identité établit la continuité des fichiers entre l'archive et le dépôt actuel, mais ne prouve pas qui les a créés ni les droits sur les éléments graphiques éventuellement incorporés. Les métadonnées d'image inspectées ne fournissent pas d'auteur ou de licence exploitable.
+
+Dans `NameForge.Version.2.zip`, `public/images/nameforge-logo.jpg` est également identique à la version de `main`. Le fichier homonyme `public/images/nameforge-logo.png` contient exactement les mêmes octets, mais ses octets sont encodés au format JPEG malgré l'extension `.png`. Cette extension trompeuse doit être corrigée si ce snapshot est réutilisé.
+
+La même archive contient aussi `src/assets/images/82a33697-4af9-41fd-ae0a-940c4c556c06.png`, une image carrée de 1254 × 1254 pixels, absente de l'arbre actuel de `main`. Aucun auteur, source, outil ou licence n'est identifiable dans ses métadonnées intégrées. Son nom UUID n'est pas une preuve de provenance. Ne pas la réintégrer avant d'avoir retrouvé le fichier source/export et confirmé les droits sur l'image.
+
+### 17.4 Modules de traduction et d'interface
+
+`nfv2.zip` contient les 29 fichiers de `src/i18n/` présents dans `main`. Vingt-huit sont identiques octet par octet. Le seul fichier différent est `src/i18n/moduleLabels.ts`; l'inspection des fins de fichier montre que la copie de l'archive comporte un saut de ligne final supplémentaire. Le contenu utile des deux fichiers est par ailleurs identique selon la comparaison effectuée.
+
+Cela établit que les modules de traduction/interface actuels sont présents dans l'archive de transfert et que leur copie correspond à celle de `main`, à l'exception de ce saut de ligne final. Cela ne démontre pas qui a rédigé ou traduit les chaînes, ni si des traductions externes ont été incorporées. Les 29 modules restent soumis à une vérification de méthode et d'éventuelles contributions de tiers.
+
+`NameForge.Version.2.zip` contient 15 modules `src/i18n/`. Un seul, `extraLanguages.ts`, est identique à `main`; les 14 autres ont des octets différents. Ce snapshot n'inclut donc pas une copie exacte de l'ensemble des modules actuels. En l'absence d'historique Git ou d'un identifiant de commit fiable dans cette archive, il n'est pas possible de déterminer son ordre chronologique par rapport à `nfv2.zip` ou à `main`.
+
+### 17.5 Conclusion de provenance
+
+- **Banques :** copies historiques retrouvées; origine et droits toujours non établis; quarantaine maintenue.
+- **Images :** continuité binaire des sept images de `nfv2.zip` vers `main` établie; auteur et droits non établis.
+- **Image UUID de l'autre ZIP :** absente de `main`; source et droits non établis.
+- **Traductions :** correspondance presque complète entre `nfv2.zip` et `main`; attribution humaine et méthode de traduction non établies.
+- **Archives :** elles apportent des preuves de possession de copies et de continuité technique, pas une preuve autonome de titularité juridique.
+
+Aucun fichier applicatif, image ou traduction n'a été modifié par cette comparaison. Aucune banque n'a été restaurée. La branche `main` n'a pas été modifiée.
