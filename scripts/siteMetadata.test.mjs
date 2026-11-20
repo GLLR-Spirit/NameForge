@@ -8,7 +8,7 @@ assert.ok(sitemap.includes('<urlset'), 'sitemap must contain a urlset root');
 assert.ok(sitemap.includes('</urlset>'), 'sitemap must close its urlset root');
 assert.deepEqual(
   locations,
-  ['https://gllr-spirit.github.io/nameforge/'],
+  ['https://gllr-spirit.github.io/NameForge/'],
   'source fallback sitemap should include the homepage before build-time expansion'
 );
 assert.ok(
@@ -82,9 +82,9 @@ console.log('Phase 4 workspace checks passed: multi-criteria search, saved proje
 
 
 const seoGenerator = readFileSync(new URL('../scripts/generate-seo-pages.ts', import.meta.url), 'utf8');
-assert.ok(seoGenerator.includes("const SITE_URL = 'https://gllr-spirit.github.io/nameforge'"), 'SEO landing pages must use the current GitHub Pages origin');
+assert.ok(seoGenerator.includes("const SITE_URL = 'https://gllr-spirit.github.io/NameForge'"), 'SEO landing pages must use the current GitHub Pages origin');
 
-const CANONICAL_ORIGIN = 'https://gllr-spirit.github.io/nameforge/';
+const CANONICAL_ORIGIN = 'https://gllr-spirit.github.io/NameForge/';
 const FORBIDDEN_ORIGINS = [
   /https?:\/\/hhkskkkdjwbf\.github\.io/i,
   /jjspa4830-hue\.github\.io/i,

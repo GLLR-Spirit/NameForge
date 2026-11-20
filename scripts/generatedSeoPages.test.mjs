@@ -10,7 +10,7 @@ const urls = [...sitemap.matchAll(/<loc>(.*?)<\/loc>/g)].map((match) => match[1]
 
 assert.ok(sitemap.includes('<urlset'), 'generated sitemap should contain a urlset root');
 assert.ok(sitemap.includes('</urlset>'), 'generated sitemap should close its urlset root');
-assert.ok(urls.includes('https://gllr-spirit.github.io/nameforge/'), 'generated sitemap should include the homepage');
+assert.ok(urls.includes('https://gllr-spirit.github.io/NameForge/'), 'generated sitemap should include the homepage');
 assert.ok(urls.length > 6500, 'generated sitemap should include every generator in all 28 languages');
 assert.equal(new Set(urls).size, urls.length, 'generated sitemap URLs should be unique');
 assert.ok(urls.every((url) => !url.includes('#')), 'sitemap URLs must not contain fragments');
@@ -29,7 +29,7 @@ const pageCount = countHtmlFiles(pagesRoot);
 assert.ok(pageCount > 6500, 'build should generate localized static HTML landing pages for the generator catalogue');
 assert.equal(pageCount, urls.length - 1, 'every generated landing page should have one sitemap entry');
 
-const CANONICAL_ORIGIN = 'https://gllr-spirit.github.io/nameforge/';
+const CANONICAL_ORIGIN = 'https://gllr-spirit.github.io/NameForge/';
 const FORBIDDEN_ORIGIN = /https?:\/\/hhkskkkdjwbf\.github\.io|jjspa4830-hue\.github\.io|rayanellg\.github\.io\/nameforge/i;
 
 assert.ok(!FORBIDDEN_ORIGIN.test(sitemap), 'generated sitemap must not contain any legacy or misspelled production origin');
@@ -64,7 +64,7 @@ for (const [lang, dir] of [['ar', 'rtl'], ['ja', 'ltr'], ['fr', 'ltr']]) {
   const html = readFileSync(join(pagesRoot, lang, 'generators', 'fantasy', 'index.html'), 'utf8');
   assert.ok(!FORBIDDEN_ORIGIN.test(html), `${lang} page must not contain any legacy or misspelled origin`);
   assert.ok(html.includes(`<html lang="${lang}" dir="${dir}">`), `${lang} page should declare its language and direction`);
-  assert.ok(html.includes(`https://gllr-spirit.github.io/nameforge/seo/${lang}/generators/fantasy/`), `${lang} page should use its own canonical URL`);
+  assert.ok(html.includes(`https://gllr-spirit.github.io/NameForge/seo/${lang}/generators/fantasy/`), `${lang} page should use its own canonical URL`);
 }
 
 console.log(`Generated SEO checks passed: ${pageCount} static landing pages and ${urls.length} sitemap URLs.`);

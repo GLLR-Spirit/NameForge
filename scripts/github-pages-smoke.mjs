@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 
-const baseUrl = process.env.PAGES_BASE_URL || 'https://gllr-spirit.github.io/nameforge/';
+const baseUrl = process.env.PAGES_BASE_URL || 'https://gllr-spirit.github.io/NameForge/';
 const failures = [];
 const checks = [];
 

@@ -8,7 +8,7 @@ import { getOpenGraphLocale, getSeoDescription } from '../src/i18n/seoMetadata';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const DIST = join(ROOT, '..', 'dist');
-const SITE_URL = 'https://gllr-spirit.github.io/nameforge';
+const SITE_URL = 'https://gllr-spirit.github.io/NameForge';
 const APP_URL = `${SITE_URL}/`;
 
 /** The 28 fully translated interface languages (25 original + uk, bn, nb). English keeps the historical /seo/generators/<id>/ URLs. */

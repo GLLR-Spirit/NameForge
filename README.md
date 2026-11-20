@@ -2,7 +2,7 @@
 
 > A multilingual creative naming workspace for brands, businesses, characters, stories, games, fictional worlds and personal projects.
 
-**Live website:** https://gllr-spirit.github.io/nameforge/
+**Live website:** https://gllr-spirit.github.io/NameForge/
 **Source repository:** https://github.com/GLLR-Spirit/NameForge
 **Default interface language:** English
 **Application type:** client-side React web application with a limited installable/offline-capable shell
@@ -945,7 +945,7 @@ The exact benchmark workload and parity harness are maintained in the repository
 
 The production site is hosted at:
 
-https://gllr-spirit.github.io/nameforge/
+https://gllr-spirit.github.io/NameForge/
 
 The deployment workflow builds the app using relative asset paths so it works under a GitHub Pages project subpath.
 
